@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>네트워크 기술문서 인덱스</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --line:#30363d;
+  --fg:#e6edf3; --dim:#9198a1; --acc:#58a6ff; --acc2:#3fb950;
+  --warn:#d29922; --danger:#f85149; --code:#0b0f14;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",
+    "Segoe UI","Noto Sans KR",sans-serif;
+  line-height:1.7; font-size:15px;
+}
+.wrap{max-width:1000px;margin:0 auto;padding:48px 24px 96px}
+a{color:var(--acc)}
+h1{font-size:30px;margin:0 0 8px;letter-spacing:-.5px}
+h2{font-size:21px;margin:52px 0 16px;padding-left:12px;border-left:4px solid var(--acc)}
+h3{font-size:16px;margin:28px 0 10px;color:var(--acc2)}
+code{background:#21262d;padding:2px 6px;border-radius:4px;
+     font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13px;color:#ffa657}
+
+header{border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:40px}
+header p{color:var(--dim);margin:0}
+
+nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:16px 20px;margin:0 0 8px}
+nav.toc p{margin:0 0 8px;color:var(--acc);font-weight:700;font-size:14px}
+nav.toc ul{margin:0;padding-left:20px}
+nav.toc li{margin:4px 0}
+nav.toc a{text-decoration:none}
+nav.toc a:hover{text-decoration:underline}
+
+.note{border-radius:8px;padding:14px 18px;margin:16px 0;
+  border-left:4px solid var(--acc);background:var(--panel)}
+.note strong{color:var(--acc)}
+
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
+.card{display:block;background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;padding:18px 20px;text-decoration:none;color:var(--fg)}
+.card:hover{border-color:var(--acc)}
+.card:hover .card-title{color:var(--acc)}
+.card-title{font-size:16px;font-weight:700;margin:0 0 6px;letter-spacing:-.2px}
+.card-desc{color:var(--dim);font-size:13.5px;margin:0 0 12px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  font-size:12px;color:var(--dim)}
+.badge{display:inline-block;border-radius:999px;padding:1px 10px;
+  font-size:11.5px;font-weight:600;background:#1f6feb33;color:var(--acc)}
+.badge.g{background:#3fb95033;color:var(--acc2)}
+.badge.w{background:#d2992233;color:var(--warn)}
+.badge.d{background:#f8514933;color:var(--danger)}
+.file{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:11.5px;color:#6e7681}
+
+table{width:100%;border-collapse:collapse;margin:16px 0;
+  background:var(--panel);border-radius:8px;overflow:hidden;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+th{background:#1f242c;font-weight:700;color:var(--fg)}
+td a{text-decoration:none}
+td a:hover{text-decoration:underline}
+.tbl-wrap{overflow-x:auto}
+.tbl-wrap table{min-width:640px}
+
+footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);
+       color:var(--dim);font-size:13px}
+footer a{color:var(--acc);text-decoration:none}
+footer a:hover{text-decoration:underline}
+
+.totop{position:fixed;right:24px;bottom:24px;width:40px;height:40px;
+  border-radius:50%;background:var(--panel);border:1px solid var(--line);
+  color:var(--fg);text-decoration:none;display:flex;align-items:center;
+  justify-content:center;font-size:18px}
+.totop:hover{border-color:var(--acc);color:var(--acc)}
+
+@media(max-width:760px){
+  .cards{grid-template-columns:1fr}
+  .wrap{padding:32px 16px 72px}
+  h1{font-size:24px}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="top">
+
+  <header>
+    <h1>네트워크 기술문서 인덱스</h1>
+    <p>Cisco ACI · Nexus Multicast · 라우팅/NAT 설계 · 성능 측정 — 총 10편</p>
+  </header>
+
+  <nav class="toc" aria-label="목차">
+    <p>목차</p>
+    <ul>
+      <li><a href="#aci">01. Cisco ACI — L3Out &amp; Telemetry (5편)</a></li>
+      <li><a href="#nexus">02. Nexus — Multicast Anycast RP (2편)</a></li>
+      <li><a href="#design">03. 라우팅 · NAT 설계 (2편)</a></li>
+      <li><a href="#tools">04. 성능 측정 도구 (1편)</a></li>
+      <li><a href="#all">05. 전체 문서 일람</a></li>
+    </ul>
+  </nav>
+
+  <div class="note">
+    <strong>읽는 순서 권장</strong><br>
+    ACI L3Out 계열은 <em>Floating L3Out → OSPF Cost → Multi-Site MED → Per-Site Locality</em>
+    순서로 읽으면 개념이 누적됩니다. Nexus 계열은 <em>설정 가이드 → 심화 비교</em> 순서를 권장합니다.
+  </div>
+
+  <h2 id="aci">01. Cisco ACI — L3Out &amp; Telemetry</h2>
+
+  <div class="cards">
+    <a class="card" href="ACI-Floating-L3Out.html">
+      <p class="card-title">ACI Floating L3Out 기술 가이드</p>
+      <p class="card-desc">Floating L3Out이 해결하는 문제, 핵심 용어, 4가지 IP 주소의 역할,
+        VMM vs Physical 도메인, 지원 시나리오까지의 전체 개념 정리.</p>
+      <div class="meta">
+        <span class="badge">기술가이드</span>
+        <span class="file">ACI-Floating-L3Out.html</span>
+        <span>2026-06-19</span>
+      </div>
+    </a>
+
+    <a class="card" href="ACI-L3Out-OSPF-Cost.html">
+      <p class="card-title">L3Out OSPF · 외부 경로 Cost/Metric 조정 가이드</p>
+      <p class="card-desc">외부 경로의 fabric 내부 전파 흐름, North/South Metric 차이,
+        Set Local Preference vs Set Metric(MED) 선택 기준. Cisco 공식 문서 기반 검증.</p>
+      <div class="meta">
+        <span class="badge g">검증가이드</span>
+        <span class="file">ACI-L3Out-OSPF-Cost.html</span>
+        <span>2026-06-24</span>
+      </div>
+    </a>
+
+    <a class="card" href="ACI-MultiSite-L3Out-MED.html">
+      <p class="card-title">Multi-Site L3Out MED Suboptimal Egress 트러블슈팅</p>
+      <p class="card-desc">OSPF Cost가 BGP MED로 매핑되어 Site간 EVPN으로 보존되면서 발생하는
+        suboptimal egress. 실측 데이터와 best-path 결정 흐름으로 원인 규명.</p>
+      <div class="meta">
+        <span class="badge d">트러블슈팅</span>
+        <span class="file">ACI-MultiSite-L3Out-MED.html</span>
+        <span>2026-06-24</span>
+      </div>
+    </a>
+
+    <a class="card" href="ACI_MultiSite_Local_L3out.html">
+      <p class="card-title">Multi-Site — Per-Site L3Out Locality 구성 가이드</p>
+      <p class="card-desc">동일 외부 경로에 대해 각 사이트가 자기 L3Out을 우선하도록 만드는 방법.
+        Match/Set Rule 상세 구성과 Site1/Site2 개별 적용 절차.</p>
+      <div class="meta">
+        <span class="badge">설정가이드</span>
+        <span class="file">ACI_MultiSite_Local_L3out.html</span>
+        <span>2026-06-25</span>
+      </div>
+    </a>
+
+    <a class="card" href="ACI-NetFlow.html">
+      <p class="card-title">Cisco ACI NetFlow 기술가이드</p>
+      <p class="card-desc">ACI 패브릭에서의 NetFlow 구성과 동작, Exporter/Monitor/Record 정책 설계
+        및 적용 대상별 고려사항.</p>
+      <div class="meta">
+        <span class="badge">기술가이드</span>
+        <span class="file">ACI-NetFlow.html</span>
+        <span>2026-06-24</span>
+      </div>
+    </a>
+  </div>
+
+  <h2 id="nexus">02. Nexus — Multicast Anycast RP</h2>
+
+  <div class="cards">
+    <a class="card" href="nexus-anycast-rp-msdp.html">
+      <p class="card-title">Nexus Anycast RP 이중화 &amp; MSDP 설정 가이드</p>
+      <p class="card-desc">전제 토폴로지와 공통 사전 설정(IGMP Snooping 포함),
+        방식 A — PIM Anycast-RP(RFC 4610) 및 방식 B — MSDP 설정과 두 방식 비교.</p>
+      <div class="meta">
+        <span class="badge">설정가이드</span>
+        <span class="file">nexus-anycast-rp-msdp.html</span>
+        <span>2026-09-10</span>
+      </div>
+    </a>
+
+    <a class="card" href="nexus-vpc-anycast-rp-deep-dive.html">
+      <p class="card-title">vPC 환경 Anycast RP 심화 — PIM Anycast-RP vs MSDP</p>
+      <p class="card-desc">두 방식의 동작 원리(RFC 4610 / RFC 3446+3618), vPC 환경에서의
+        실제 멀티캐스트 동작, RP 위치 선정(vPC pair 내부 vs 외부) 판단 기준.</p>
+      <div class="meta">
+        <span class="badge g">심층분석</span>
+        <span class="file">nexus-vpc-anycast-rp-deep-dive.html</span>
+        <span>2026-09-16</span>
+      </div>
+    </a>
+  </div>
+
+  <h2 id="design">03. 라우팅 · NAT 설계</h2>
+
+  <div class="cards">
+    <a class="card" href="VRFvsVRFlite.html">
+      <p class="card-title">VRF vs VRF Lite — 심층 분석</p>
+      <p class="card-desc">VRF의 구성 요소(RD · RT · RIB · FIB)부터 VRF Lite와
+        MPLS L3VPN(Full VRF)의 컨트롤/데이터 플레인 비교까지. TL;DR 요약 포함.</p>
+      <div class="meta">
+        <span class="badge g">심층분석</span>
+        <span class="file">VRFvsVRFlite.html</span>
+        <span>2026-06-30</span>
+      </div>
+    </a>
+
+    <a class="card" href="M365_NAT.html">
+      <p class="card-title">M365 트래픽을 위한 NAT 설계 — 1:1 NAT vs PAT</p>
+      <p class="card-desc">M365에서 NAT이 까다로운 이유, PAT 포트 사이징 계산,
+        혼합 설계 5단계와 모니터링 체크리스트.</p>
+      <div class="meta">
+        <span class="badge w">분석메모</span>
+        <span class="file">M365_NAT.html</span>
+        <span>2026-06-30</span>
+      </div>
+    </a>
+  </div>
+
+  <h2 id="tools">04. 성능 측정 도구</h2>
+
+  <div class="cards">
+    <a class="card" href="iperf-guide.html">
+      <p class="card-title">iperf / iperf3 완전 정리</p>
+      <p class="card-desc">iperf2 vs iperf3 차이, 설치, 동작 원리, 공통 옵션과
+        서버/클라이언트 전용 옵션 레퍼런스.</p>
+      <div class="meta">
+        <span class="badge">기술가이드</span>
+        <span class="file">iperf-guide.html</span>
+        <span>2026-09-16</span>
+      </div>
+    </a>
+  </div>
+
+  <h2 id="all">05. 전체 문서 일람</h2>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr><th>#</th><th>문서</th><th>분류</th><th>파일</th><th>최종 수정</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><a href="ACI-Floating-L3Out.html">ACI Floating L3Out 기술 가이드</a></td>
+        <td>ACI</td><td class="file">ACI-Floating-L3Out.html</td><td>2026-06-19</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><a href="ACI-L3Out-OSPF-Cost.html">L3Out OSPF Cost/Metric 조정 가이드</a></td>
+        <td>ACI</td><td class="file">ACI-L3Out-OSPF-Cost.html</td><td>2026-06-24</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><a href="ACI-MultiSite-L3Out-MED.html">Multi-Site L3Out MED 트러블슈팅</a></td>
+        <td>ACI</td><td class="file">ACI-MultiSite-L3Out-MED.html</td><td>2026-06-24</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><a href="ACI-NetFlow.html">Cisco ACI NetFlow 기술가이드</a></td>
+        <td>ACI</td><td class="file">ACI-NetFlow.html</td><td>2026-06-24</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><a href="ACI_MultiSite_Local_L3out.html">Multi-Site Per-Site L3Out Locality</a></td>
+        <td>ACI</td><td class="file">ACI_MultiSite_Local_L3out.html</td><td>2026-06-25</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td><a href="nexus-anycast-rp-msdp.html">Nexus Anycast RP 이중화 &amp; MSDP 설정</a></td>
+        <td>Nexus</td><td class="file">nexus-anycast-rp-msdp.html</td><td>2026-09-10</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td><a href="nexus-vpc-anycast-rp-deep-dive.html">vPC Anycast RP 심화 비교</a></td>
+        <td>Nexus</td><td class="file">nexus-vpc-anycast-rp-deep-dive.html</td><td>2026-09-16</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td><a href="VRFvsVRFlite.html">VRF vs VRF Lite 심층 분석</a></td>
+        <td>설계</td><td class="file">VRFvsVRFlite.html</td><td>2026-06-30</td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td><a href="M365_NAT.html">M365 NAT 설계 — 1:1 NAT vs PAT</a></td>
+        <td>설계</td><td class="file">M365_NAT.html</td><td>2026-06-30</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td><a href="iperf-guide.html">iperf / iperf3 완전 정리</a></td>
+        <td>도구</td><td class="file">iperf-guide.html</td><td>2026-09-16</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <footer>
+    <p>03_HTML_Docs · 단일 파일 HTML 기술문서 모음 · 문서 10편</p>
+  </footer>
+
+  <a class="totop" href="#top" title="맨 위로" aria-label="맨 위로">&#8593;</a>
+</div>
+</body>
+</html>
