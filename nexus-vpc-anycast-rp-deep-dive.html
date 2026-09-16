@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cisco Nexus vPC 환경 Anycast RP 심화 — PIM Anycast-RP vs MSDP 비교 분석</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --line:#30363d;
+    --fg:#e6edf3; --dim:#9198a1; --acc:#58a6ff; --acc2:#3fb950;
+    --warn:#d29922; --danger:#f85149; --code:#0b0f14;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",
+      "Segoe UI","Noto Sans KR",sans-serif;
+    line-height:1.7; font-size:15px;
+  }
+  .wrap{max-width:1000px;margin:0 auto;padding:48px 24px 96px}
+  header{border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:40px}
+  h1{font-size:30px;margin:0 0 8px;letter-spacing:-.5px}
+  header p{margin:0;color:var(--dim)}
+  h2{
+    font-size:21px;margin:52px 0 16px;padding-left:12px;
+    border-left:4px solid var(--acc);
+  }
+  h3{font-size:16px;margin:28px 0 10px;color:var(--acc2)}
+  p{margin:10px 0}
+  code{
+    background:#21262d;padding:2px 6px;border-radius:4px;
+    font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13px;color:#ffa657;
+  }
+  pre{
+    background:var(--code);border:1px solid var(--line);border-radius:8px;
+    padding:16px 18px;overflow-x:auto;margin:12px 0;
+  }
+  pre code{background:none;padding:0;color:#e6edf3;font-size:13px;line-height:1.6}
+  .cmt{color:#6e7681;font-style:italic}
+  .kw{color:#79c0ff}
+  .ip{color:#7ee787}
+  table{
+    width:100%;border-collapse:collapse;margin:16px 0;
+    background:var(--panel);border-radius:8px;overflow:hidden;font-size:14px;
+  }
+  th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line)}
+  th{background:#1f242c;color:var(--acc);font-weight:600}
+  tr:last-child td{border-bottom:none}
+  .note,.warn,.tip{
+    border-radius:8px;padding:14px 18px;margin:16px 0;border-left:4px solid;
+    background:var(--panel);
+  }
+  .note{border-color:var(--acc)}
+  .warn{border-color:var(--warn)}
+  .tip{border-color:var(--acc2)}
+  .note strong{color:var(--acc)}
+  .warn strong{color:var(--warn)}
+  .tip strong{color:var(--acc2)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 18px 18px}
+  .card h3{margin-top:14px}
+  ol,ul{padding-left:22px} li{margin:6px 0}
+  .badge{
+    display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;
+    background:#1f6feb33;color:var(--acc);margin-left:8px;vertical-align:middle;
+  }
+  .badge.g{background:#3fb95033;color:var(--acc2)}
+  footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);color:var(--dim);font-size:13px}
+
+  .toc{
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:14px 16px; margin:0 0 28px;
+  }
+  .toc p{margin:0 0 8px;color:var(--acc);font-weight:600}
+  .toc ul{margin:0;padding-left:18px}
+  .toc a{color:var(--fg);text-decoration:none}
+  .toc a:hover{color:var(--acc);text-decoration:underline}
+  .totop{
+    position:fixed; right:24px; bottom:24px; z-index:50;
+    display:flex; align-items:center; justify-content:center;
+    width:42px; height:42px; border-radius:50%;
+    background:var(--panel); border:1px solid var(--line);
+    color:var(--acc); text-decoration:none; font-size:17px; line-height:1;
+    opacity:.55; transition:opacity .15s, border-color .15s;
+  }
+  .totop:hover{opacity:1;border-color:var(--acc)}
+  @media(max-width:760px){.totop{right:12px;bottom:12px}}
+  .diagram{
+    background:var(--code); border:1px solid var(--line); border-radius:8px;
+    padding:18px 16px; margin:16px 0; overflow-x:auto;
+  }
+  .diagram svg{display:block;width:100%;height:auto;max-width:100%}
+  .diagram figcaption{
+    margin-top:12px; padding-top:10px; border-top:1px solid var(--line);
+    color:var(--dim); font-size:12.5px; text-align:center;
+  }
+  .flow{counter-reset:step;list-style:none;padding-left:0;margin:10px 0}
+  .flow li{
+    position:relative; padding:10px 12px 10px 42px; margin:8px 0;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+  }
+  .flow li::before{
+    counter-increment:step; content:counter(step);
+    position:absolute; left:12px; top:10px; width:20px; height:20px;
+    border-radius:50%; background:#1f6feb33; color:var(--acc);
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;
+  }
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.cmp{grid-template-columns:1fr}}
+  .danger-box{
+    border-radius:8px;padding:14px 18px;margin:16px 0;border-left:4px solid var(--danger);
+    background:var(--panel);
+  }
+  .danger-box strong{color:var(--danger)}
+  .q{
+    background:var(--panel); border:1px dashed var(--line); border-radius:8px;
+    padding:14px 16px; margin:14px 0;
+  }
+  h2 a.anchor{color:var(--dim);text-decoration:none;opacity:0;margin-left:8px;font-weight:400}
+  h2:hover a.anchor{opacity:1}
+  details{margin-top:8px}
+  summary{color:var(--acc2);cursor:pointer}
+  footer a{color:var(--acc);text-decoration:none}
+  footer a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="wrap" id="top">
+
+<header>
+  <h1>Cisco Nexus vPC 환경 Anycast RP 심화 — PIM Anycast-RP vs MSDP 비교 분석</h1>
+  <p>네트워크 엔지니어 교육용 기술 자료 · RFC 4610 / RFC 3618 / RFC 3446 · NX-OS 기준</p>
+</header>
+
+<nav class="toc" aria-label="목차">
+  <p>목차</p>
+  <ul>
+    <li><a href="#why-anycast-rp">1. 왜 Anycast RP인가 — 문제 정의</a></li>
+    <li><a href="#topology-addressing">2. 전제 토폴로지 및 주소 설계</a></li>
+    <li><a href="#pim-anycast-rp">3. PIM Anycast-RP (RFC 4610) 동작 원리</a></li>
+    <li><a href="#msdp-anycast-rp">4. MSDP Anycast-RP (RFC 3446 + RFC 3618) 동작 원리</a></li>
+    <li><a href="#vpc-multicast-behavior">5. vPC 환경에서 멀티캐스트가 실제로 동작하는 방식</a></li>
+    <li><a href="#rp-placement">6. RP를 어디에 둘 것인가 — vPC pair 내부 vs 외부</a></li>
+    <li><a href="#pre-build-spt">7. <code>ip pim pre-build-spt</code></a></li>
+    <li><a href="#failure-scenarios">8. 장애 시나리오별 동작 분석</a></li>
+    <li><a href="#comparison-matrix">9. 종합 비교 매트릭스</a></li>
+    <li><a href="#vxlan-trm">10. VXLAN EVPN TRM 과의 관계</a></li>
+    <li><a href="#verification-troubleshooting">11. 검증 및 트러블슈팅 명령어</a></li>
+    <li><a href="#common-errors">12. 자주 발생하는 설정 오류 10선</a></li>
+    <li><a href="#design-decision-guide">13. 설계 의사결정 가이드</a></li>
+    <li><a href="#self-check">14. 교육용 자가 점검 문제</a></li>
+    <li><a href="#final-summary">15. 요약 — 7가지 핵심 정리</a></li>
+  </ul>
+</nav>
+
+<h2 id="why-anycast-rp">1. 왜 Anycast RP인가 — 문제 정의<a class="anchor" href="#why-anycast-rp">#</a></h2>
+
+<p>
+  멀티캐스트 Sparse Mode에서 RP는 source와 receiver를 처음 연결해 주는 control-plane 중심점이다.
+  그래서 RP 하나만 두면 구성은 단순해 보이지만,
+  실제 운영에서는 장애와 수렴 관점에서 부담이 커진다.
+</p>
+
+<h3>단일 RP의 구조적 한계</h3>
+<ul>
+  <li><strong>SPOF</strong>: RP node 자체 장애, loopback reachability 상실, 또는 RP 인접 구간 장애가 곧 서비스 영향으로 이어진다.</li>
+  <li><strong>수렴 지연</strong>: RP 장애 후 새 RP로 전환되는 동안 Register/Join 흐름이 재정렬된다.</li>
+  <li><strong>확장성 제약</strong>: 대규모 그룹/소스 환경에서 제어 트래픽과 상태 관리가 한 노드에 집중된다.</li>
+</ul>
+
+<h3>Auto-RP/BSR와 Anycast RP의 위치</h3>
+<p>
+  Auto-RP/BSR은 “어떤 RP를 사용할지”를 알리는 discovery 메커니즘이다.
+  반면 Anycast RP는 “동일 RP 주소를 여러 장비가 공유해, IGP 최단경로로 가장 가까운 RP에 붙게 만드는” 가용성/수렴 메커니즘이다.
+  즉, 역할이 다르다.
+</p>
+
+<p>
+  핵심 아이디어는 간단하다.
+  여러 RP에 동일한 /32(예: <code>5.1.1.1/32</code>)를 부여하고 IGP에 광고하면,
+  source DR과 receiver LHR은 유니캐스트 라우팅 기준으로 가까운 RP를 자동 선택한다.
+</p>
+
+<p>
+  그런데 여기서 바로 질문이 나온다.
+  <strong>“각 RP가 source 정보를 서로 어떻게 맞출 것인가?”</strong>
+  이 질문이 곧 PIM Anycast-RP(RFC 4610)와 MSDP Anycast-RP(RFC 3446, RFC 3618) 분기점이다.
+</p>
+
+<div class="note">
+  <strong>한 문장 요약</strong><br>
+  Anycast RP의 본질은 <b>RP 선택을 IGP로 단순화</b>하는 데 있고,
+  실무 선택지는 <b>source state 동기화를 PIM Register로 할지, MSDP SA로 할지</b>다.
+</div>
+
+<h2 id="topology-addressing">2. 전제 토폴로지 및 주소 설계<a class="anchor" href="#topology-addressing">#</a></h2>
+
+<p>
+  본 문서는 아래 convention을 모든 예시에 일관 적용한다.
+  기존 운영 가이드(1.1.1.1 / 1.1.1.2 / 5.1.1.1)와 연속성을 맞추기 위함이다.
+</p>
+
+<table>
+  <tr>
+    <th>장비</th>
+    <th>역할</th>
+    <th>Loopback0 (unique / router-id / PIM source)</th>
+    <th>Loopback1 (Anycast RP)</th>
+    <th>비고</th>
+  </tr>
+  <tr>
+    <td>N9K-1</td>
+    <td>vPC primary</td>
+    <td><code>1.1.1.1/32</code></td>
+    <td><code>5.1.1.1/32</code></td>
+    <td>Po1 peer-link, mgmt0 keepalive</td>
+  </tr>
+  <tr>
+    <td>N9K-2</td>
+    <td>vPC secondary</td>
+    <td><code>1.1.1.2/32</code></td>
+    <td><code>5.1.1.1/32</code></td>
+    <td>Po1 peer-link, mgmt0 keepalive</td>
+  </tr>
+  <tr>
+    <td>멀티캐스트 그룹</td>
+    <td>운영 범위</td>
+    <td colspan="3"><code>239.0.0.0/8</code> (일반 설명 시 <code>224.0.0.0/4</code> 병기)</td>
+  </tr>
+</table>
+
+<figure class="diagram">
+<svg viewBox="0 0 900 560" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>vPC pair가 Anycast RP를 겸하는 기준 토폴로지</title>
+<defs>
+  <marker id="arrow-d1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+  </marker>
+</defs>
+<style>
+  .d1-t{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Segoe UI','Noto Sans KR',sans-serif}
+  .d1-m{font-family:'SF Mono',Menlo,Consolas,monospace}
+</style>
+<rect x="0" y="0" width="900" height="560" fill="none"/>
+
+<!-- Receiver -->
+<rect x="375" y="20" width="150" height="44" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d1-t" x="450" y="47" text-anchor="middle" font-size="14" fill="#e6edf3">Receiver</text>
+
+<!-- link: receiver -> vpc domain -->
+<line x1="450" y1="64" x2="450" y2="138" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow-d1)"/>
+<rect x="365" y="92" width="170" height="20" fill="#0b0f14"/>
+<text class="d1-m" x="450" y="106" text-anchor="middle" font-size="12" fill="#9198a1">vPC Port-Channel</text>
+
+<!-- vPC Domain group -->
+<rect x="50" y="140" width="800" height="230" rx="10" fill="#58a6ff" fill-opacity="0.04" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text class="d1-t" x="72" y="164" font-size="13" fill="#58a6ff" font-weight="700">vPC Domain</text>
+
+<!-- N9K-1 box (x=75..340) -->
+<rect x="75" y="178" width="265" height="150" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d1-t" x="93" y="204" font-size="15" font-weight="700" fill="#e6edf3">N9K-1</text>
+<rect x="242" y="190" width="84" height="22" rx="11" fill="#58a6ff" fill-opacity="0.15" stroke="#58a6ff" stroke-width="1"/>
+<text class="d1-t" x="284" y="205" text-anchor="middle" font-size="11" fill="#58a6ff">vPC primary</text>
+<text class="d1-m" x="93" y="240" font-size="12" fill="#9198a1">Lo0: <tspan fill="#7ee787">1.1.1.1/32</tspan></text>
+<rect x="83" y="252" width="249" height="24" rx="4" fill="#3fb950" fill-opacity="0.08"/>
+<text class="d1-m" x="93" y="269" font-size="12" fill="#9198a1">Lo1: <tspan fill="#7ee787">5.1.1.1/32</tspan></text>
+<rect x="244" y="257" width="80" height="18" rx="9" fill="#3fb950" fill-opacity="0.18" stroke="#3fb950" stroke-width="1"/>
+<text class="d1-t" x="284" y="270" text-anchor="middle" font-size="10.5" fill="#3fb950">Anycast RP</text>
+
+<!-- N9K-2 box (x=560..825) -->
+<rect x="560" y="178" width="265" height="150" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d1-t" x="578" y="204" font-size="15" font-weight="700" fill="#e6edf3">N9K-2</text>
+<rect x="717" y="190" width="94" height="22" rx="11" fill="#58a6ff" fill-opacity="0.15" stroke="#58a6ff" stroke-width="1"/>
+<text class="d1-t" x="764" y="205" text-anchor="middle" font-size="11" fill="#58a6ff">vPC secondary</text>
+<text class="d1-m" x="578" y="240" font-size="12" fill="#9198a1">Lo0: <tspan fill="#7ee787">1.1.1.2/32</tspan></text>
+<rect x="568" y="252" width="249" height="24" rx="4" fill="#3fb950" fill-opacity="0.08"/>
+<text class="d1-m" x="578" y="269" font-size="12" fill="#9198a1">Lo1: <tspan fill="#7ee787">5.1.1.1/32</tspan></text>
+<rect x="729" y="257" width="80" height="18" rx="9" fill="#3fb950" fill-opacity="0.18" stroke="#3fb950" stroke-width="1"/>
+<text class="d1-t" x="769" y="270" text-anchor="middle" font-size="10.5" fill="#3fb950">Anycast RP</text>
+
+<!-- shared anycast callout: below both boxes, connector ticks from each Lo1 row -->
+<line x1="170" y1="276" x2="385" y2="340" stroke="#3fb950" stroke-width="1.2" stroke-dasharray="2 3"/>
+<line x1="655" y1="276" x2="515" y2="340" stroke="#3fb950" stroke-width="1.2" stroke-dasharray="2 3"/>
+<rect x="385" y="340" width="130" height="20" rx="8" fill="#0b0f14" stroke="#3fb950" stroke-width="1"/>
+<text class="d1-t" x="450" y="354" text-anchor="middle" font-size="10.5" fill="#3fb950" font-weight="700">동일 Anycast RP 주소</text>
+
+<!-- peer-link: spans the 220px inter-switch gap (340..560), label centered and fully inside it -->
+<line x1="340" y1="206" x2="560" y2="206" stroke="#58a6ff" stroke-width="3"/>
+<rect x="380" y="196" width="140" height="20" fill="#0b0f14"/>
+<text class="d1-m" x="450" y="210" text-anchor="middle" font-size="11.5" fill="#58a6ff">Po1 (peer-link)</text>
+
+<!-- mgmt0 keepalive: also fully inside the gap, no overlap with peer-link label -->
+<line x1="340" y1="230" x2="560" y2="230" stroke="#9198a1" stroke-width="1.5" stroke-dasharray="4 3"/>
+<rect x="375" y="221" width="150" height="18" fill="#0b0f14"/>
+<text class="d1-m" x="450" y="234" text-anchor="middle" font-size="11" fill="#9198a1">mgmt0 (keepalive)</text>
+
+<!-- uplinks converging (verticals now sit under the new box centers 207.5 / 692.5) -->
+<line x1="207.5" y1="328" x2="207.5" y2="360" stroke="#30363d" stroke-width="1.5"/>
+<line x1="207.5" y1="360" x2="450" y2="400" stroke="#30363d" stroke-width="1.5"/>
+<line x1="692.5" y1="328" x2="692.5" y2="360" stroke="#30363d" stroke-width="1.5"/>
+<line x1="692.5" y1="360" x2="450" y2="400" stroke="#30363d" stroke-width="1.5"/>
+<line x1="450" y1="400" x2="450" y2="448" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow-d1)"/>
+<rect x="360" y="404" width="180" height="20" fill="#0b0f14"/>
+<text class="d1-m" x="450" y="418" text-anchor="middle" font-size="11.5" fill="#9198a1">L3 uplinks · IGP + PIM</text>
+
+<!-- Source DR / Source S -->
+<rect x="370" y="452" width="160" height="46" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d1-t" x="450" y="480" text-anchor="middle" font-size="14" fill="#e6edf3">Source DR</text>
+<line x1="530" y1="475" x2="598" y2="475" stroke="#30363d" stroke-width="1.5"/>
+<rect x="600" y="452" width="140" height="46" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d1-t" x="670" y="480" text-anchor="middle" font-size="14" fill="#e6edf3">Source S</text>
+
+<!-- group example -->
+<text class="d1-m" x="450" y="530" text-anchor="middle" font-size="12" fill="#9198a1">Group Example: <tspan fill="#7ee787">239.1.1.1</tspan> (범위: 239.0.0.0/8)</text>
+</svg>
+<figcaption>전제 토폴로지 — vPC pair가 Anycast RP를 겸하는 기준 구성 (Group: 239.0.0.0/8)</figcaption>
+</figure>
+
+<div class="warn">
+  <strong>Loopback 분리가 필수인 이유</strong><br>
+  Anycast 주소(<code>5.1.1.1</code>)와 unique 주소(<code>1.1.1.1</code>/<code>1.1.1.2</code>)를 같게 쓰면,
+  RFC 4610의 loop-prevention 조건(“Register source가 Anycast-RP set member인지 판정”)이 무너질 수 있다.
+  MSDP에서는 더 직접적으로 문제를 일으킨다.
+  <code>originator-id</code> 중복으로 SA가 duplicate RP address/peer-RPF 검증 단계에서 폐기될 수 있다.
+</div>
+
+<h2 id="pim-anycast-rp">3. PIM Anycast-RP (RFC 4610) 동작 원리<a class="anchor" href="#pim-anycast-rp">#</a></h2>
+
+<p>
+  PIM Anycast-RP는 “별도 프로토콜 없이 PIM Register 자체를 RP 간 복제”한다.
+  그래서 intra-domain NX-OS 환경에서 운영 단순성이 높다.
+  이 메커니즘이 없으면,
+  source가 RP1에 붙었는데 receiver가 RP2를 향할 때 RP2가 source를 모르는 상태가 지속된다.
+</p>
+
+<h3>3-1. Register 복제 절차 (1~7)</h3>
+<ol class="flow">
+  <li>Source DR이 첫 멀티캐스트 패킷을 RP Anycast 주소(<code>5.1.1.1</code>)로 Register encapsulation 하여 전송한다.</li>
+  <li>IGP 최단경로로 가장 가까운 RP(예: N9K-1)가 Register를 수신한다.</li>
+  <li>RP1은 Register decapsulation 후 shared tree(또는 정책에 따른 트리)로 전달을 시작한다.</li>
+  <li>RP1은 (S,G) state를 생성한다.</li>
+  <li>RP1은 Anycast-RP set의 나머지 멤버(예: 1.1.1.2)에게 Register copy를 전송한다. 이때 source IP는 자신의 unique Lo0이다.</li>
+  <li>RP1은 DR에 Register-Stop을 보낸다(필요 시 Null-Register 갱신 주기 유지).</li>
+  <li>RP2는 복제 Register를 기반으로 동일한 (S,G) state를 생성하여 receiver 측 요청에 즉시 대응 가능해진다.</li>
+</ol>
+
+<figure class="diagram">
+<svg viewBox="0 0 960 430" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>PIM Anycast-RP Register 복제 절차 시퀀스</title>
+<defs>
+  <marker id="arrow-d2-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+  </marker>
+  <marker id="arrow-d2-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#3fb950"/>
+  </marker>
+  <marker id="arrow-d2-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#d29922"/>
+  </marker>
+</defs>
+<style>
+  .d2-t{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Segoe UI','Noto Sans KR',sans-serif}
+  .d2-m{font-family:'SF Mono',Menlo,Consolas,monospace}
+</style>
+
+<!-- actor boxes -->
+<rect x="55" y="26" width="190" height="72" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d2-t" x="150" y="50" text-anchor="middle" font-size="12" fill="#9198a1">Source S</text>
+<text class="d2-t" x="150" y="66" text-anchor="middle" font-size="11" fill="#9198a1">↓</text>
+<text class="d2-t" x="150" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#e6edf3">DR</text>
+
+<rect x="385" y="26" width="190" height="92" rx="6" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+<text class="d2-t" x="480" y="50" text-anchor="middle" font-size="14" font-weight="700" fill="#e6edf3">RP1 (N9K-1)</text>
+<text class="d2-m" x="480" y="70" text-anchor="middle" font-size="12" fill="#7ee787">Lo0=1.1.1.1</text>
+<text class="d2-m" x="480" y="90" text-anchor="middle" font-size="11.5" fill="#3fb950">Anycast 5.1.1.1</text>
+
+<rect x="715" y="26" width="190" height="92" rx="6" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+<text class="d2-t" x="810" y="50" text-anchor="middle" font-size="14" font-weight="700" fill="#e6edf3">RP2 (N9K-2)</text>
+<text class="d2-m" x="810" y="70" text-anchor="middle" font-size="12" fill="#7ee787">Lo0=1.1.1.2</text>
+<text class="d2-m" x="810" y="90" text-anchor="middle" font-size="11.5" fill="#3fb950">Anycast 5.1.1.1</text>
+
+<!-- lifelines -->
+<line x1="150" y1="118" x2="150" y2="350" stroke="#30363d" stroke-width="1.5" stroke-dasharray="3 4"/>
+<line x1="480" y1="118" x2="480" y2="350" stroke="#30363d" stroke-width="1.5" stroke-dasharray="3 4"/>
+<line x1="810" y1="118" x2="810" y2="350" stroke="#30363d" stroke-width="1.5" stroke-dasharray="3 4"/>
+
+<!-- step 1: Register DR -> RP1 -->
+<circle cx="150" cy="146" r="11" fill="#58a6ff"/>
+<text class="d2-t" x="150" y="150" text-anchor="middle" font-size="11" font-weight="700" fill="#0d1117">1</text>
+<line x1="163" y1="146" x2="470" y2="146" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow-d2-blue)"/>
+<rect x="220" y="132" width="220" height="18" fill="#0b0f14"/>
+<text class="d2-m" x="330" y="146" text-anchor="middle" font-size="11.5" fill="#e6edf3">Register (dst=5.1.1.1)</text>
+
+<!-- step 2: self loop decap on RP1 -->
+<path d="M 480,178 h 70 v 24 h -70" fill="none" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arrow-d2-green)"/>
+<circle cx="480" cy="178" r="11" fill="#58a6ff"/>
+<text class="d2-t" x="480" y="182" text-anchor="middle" font-size="11" font-weight="700" fill="#0d1117">2</text>
+<text class="d2-t" x="560" y="196" font-size="11.5" fill="#3fb950">decap → shared tree 전달</text>
+
+<!-- step 3: (S,G) state on RP1 -->
+<circle cx="480" cy="228" r="11" fill="#58a6ff"/>
+<text class="d2-t" x="480" y="232" text-anchor="middle" font-size="11" font-weight="700" fill="#0d1117">3</text>
+<text class="d2-t" x="500" y="232" font-size="11.5" fill="#3fb950">(S,G) state 생성</text>
+
+<!-- step 4: Register copy RP1 -> RP2 -->
+<circle cx="480" cy="268" r="11" fill="#58a6ff"/>
+<text class="d2-t" x="480" y="272" text-anchor="middle" font-size="11" font-weight="700" fill="#0d1117">4</text>
+<line x1="493" y1="268" x2="800" y2="268" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arrow-d2-green)"/>
+<rect x="540" y="254" width="260" height="18" fill="#0b0f14"/>
+<text class="d2-m" x="670" y="268" text-anchor="middle" font-size="11.5" fill="#e6edf3">Register copy (src=1.1.1.1)</text>
+<rect x="550" y="278" width="200" height="40" rx="4" fill="#d29922" fill-opacity="0.12" stroke="#d29922" stroke-width="1"/>
+<text class="d2-t" x="650" y="295" text-anchor="middle" font-size="10" fill="#d29922">src는 RP1의 unique 주소(1.1.1.1)</text>
+<text class="d2-t" x="650" y="311" text-anchor="middle" font-size="10" fill="#d29922">anycast 아님 — 루프 방지 핵심</text>
+
+<!-- step 5: Register-Stop RP1 -> DR -->
+<circle cx="480" cy="325" r="11" fill="#58a6ff"/>
+<text class="d2-t" x="480" y="329" text-anchor="middle" font-size="11" font-weight="700" fill="#0d1117">5</text>
+<line x1="467" y1="325" x2="163" y2="325" stroke="#d29922" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-d2-amber)"/>
+<rect x="230" y="311" width="150" height="18" fill="#0b0f14"/>
+<text class="d2-m" x="305" y="325" text-anchor="middle" font-size="11.5" fill="#d29922">Register-Stop</text>
+
+<!-- step 6: (S,G) state on RP2 -->
+<circle cx="810" cy="356" r="11" fill="#58a6ff"/>
+<text class="d2-t" x="810" y="360" text-anchor="middle" font-size="11" font-weight="700" fill="#0d1117">6</text>
+<text class="d2-t" x="740" y="360" text-anchor="end" font-size="11.5" fill="#3fb950">(S,G) state 생성</text>
+
+<!-- legend -->
+<rect x="55" y="360" width="330" height="60" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<line x1="70" y1="376" x2="100" y2="376" stroke="#58a6ff" stroke-width="1.5"/>
+<text class="d2-t" x="106" y="380" font-size="11" fill="#9198a1">실선 = Register</text>
+<line x1="70" y1="394" x2="100" y2="394" stroke="#d29922" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text class="d2-t" x="106" y="398" font-size="11" fill="#9198a1">점선 = Register-Stop</text>
+<line x1="70" y1="412" x2="100" y2="412" stroke="#3fb950" stroke-width="1.5"/>
+<text class="d2-t" x="106" y="416" font-size="11" fill="#9198a1">초록 = RP 간 복제</text>
+</svg>
+<figcaption>PIM Anycast-RP Register 복제 흐름 — 복제 Register의 source는 RP의 unique 주소(1.1.1.1)</figcaption>
+</figure>
+
+<h3>3-2. Loop prevention 규칙 (핵심)</h3>
+<ul>
+  <li>
+    RFC 4610 핵심 조건:
+    Register의 source address가 Anycast-RP set member로 식별되면,
+    그 Register는 다시 다른 멤버로 재복제하지 않는다.
+  </li>
+  <li>
+    목적:
+    RP set 내부에서 Register 복제 루프가 생기는 것을 원천 차단한다.
+  </li>
+  <li>
+    TTL 처리:
+    복제 Register는 원본 Register의 TTL 정보를 정책/RFC 규칙에 맞게 복사해 사용한다.
+    TTL을 임의 변형하면 기대한 loop 방지 모델과 디버깅 가정이 깨진다.
+  </li>
+</ul>
+
+<h3>3-3. Register-Stop 및 유실 복구</h3>
+<p>
+  PIM Anycast-RP는 “영구 DB 복제”가 아니라,
+  Register 이벤트를 매개로 source state를 동기화/재생성하는 모델이다.
+  따라서 복제 Register가 순간 유실될 수는 있다.
+</p>
+
+<p>
+  이때 DR의 register suppression timer가 만료되면,
+  DR은 다시 Register를 전송한다.
+  RP는 이를 통해 state를 재학습한다.
+  즉, 단기 유실이 즉시 영구 불능을 의미하지 않는다.
+</p>
+
+<div class="note">
+  <strong>운영 해석</strong><br>
+  PIM Anycast-RP는 event-driven 재학습 구조다.
+  “복제 패킷 1회 유실 = 영구 장애”가 아니라,
+  timer 기반 재전송으로 회복되는 구조인지 이해해야 정확한 장애 판단이 가능하다.
+</div>
+
+<h3>3-4. NX-OS 설정 예시</h3>
+<div class="grid">
+  <div class="card">
+    <h3>N9K-1</h3>
+<pre><code><span class="kw">feature</span> pim
+
+<span class="kw">interface</span> loopback0
+  ip address <span class="ip">1.1.1.1/32</span>
+  ip router ospf 10 area 0
+  ip pim sparse-mode
+
+<span class="kw">interface</span> loopback1
+  ip address <span class="ip">5.1.1.1/32</span>
+  ip router ospf 10 area 0
+  ip pim sparse-mode
+
+ip pim rp-address <span class="ip">5.1.1.1</span> group-list <span class="ip">239.0.0.0/8</span>
+
+ip pim anycast-rp <span class="ip">5.1.1.1</span> <span class="ip">1.1.1.1</span>
+ip pim anycast-rp <span class="ip">5.1.1.1</span> <span class="ip">1.1.1.2</span></code></pre>
+  </div>
+  <div class="card">
+    <h3>N9K-2</h3>
+<pre><code><span class="kw">feature</span> pim
+
+<span class="kw">interface</span> loopback0
+  ip address <span class="ip">1.1.1.2/32</span>
+  ip router ospf 10 area 0
+  ip pim sparse-mode
+
+<span class="kw">interface</span> loopback1
+  ip address <span class="ip">5.1.1.1/32</span>
+  ip router ospf 10 area 0
+  ip pim sparse-mode
+
+ip pim rp-address <span class="ip">5.1.1.1</span> group-list <span class="ip">239.0.0.0/8</span>
+
+ip pim anycast-rp <span class="ip">5.1.1.1</span> <span class="ip">1.1.1.1</span>
+ip pim anycast-rp <span class="ip">5.1.1.1</span> <span class="ip">1.1.1.2</span></code></pre>
+  </div>
+</div>
+
+<p>
+  문법:
+  <code>ip pim anycast-rp &lt;anycast-address&gt; &lt;rp-set-member-unique-address&gt;</code>
+</p>
+
+<ul>
+  <li>양쪽 장비에 동일한 RP set을 넣는다.</li>
+  <li>자기 자신 unique 주소도 구성에 포함하는 것이 정상 형태다.</li>
+  <li>group-list는 운영 정책상 <code>239.0.0.0/8</code>로 제한하고, 일반 문서 설명에서만 <code>224.0.0.0/4</code>를 병기한다.</li>
+</ul>
+
+<h2 id="msdp-anycast-rp">4. MSDP Anycast-RP (RFC 3446 + RFC 3618) 동작 원리<a class="anchor" href="#msdp-anycast-rp">#</a></h2>
+
+<p>
+  MSDP Anycast-RP는 RP 간 source 존재 사실을 SA(Source-Active)로 교환한다.
+  PIM Anycast-RP와 달리,
+  별도 TCP 세션과 SA cache가 들어와 control-plane 복잡도가 증가하지만,
+  inter-domain 또는 멀티벤더 연동에 유리하다.
+</p>
+
+<h3>4-1. SA 기반 source discovery 절차</h3>
+<ol class="flow">
+  <li>RP1이 local source의 Register를 받아 (S,G)를 인지한다.</li>
+  <li>RP1은 TCP 639 세션 위로 SA message를 MSDP peer(RP2)로 전송한다.</li>
+  <li>RP2는 SA를 수신해 peer-RPF 검증을 수행한다.</li>
+  <li>검증 통과 시 SA cache에 (S,G,R-originator)를 저장한다.</li>
+  <li>RP2 측 receiver Join이 들어오면, RP2는 source 방향으로 PIM Join을 유도한다.</li>
+  <li>필요하면 SA를 다른 peer로 flood(또는 mesh-group 룰에 따라 제한)한다.</li>
+</ol>
+
+<h3>4-2. TCP 639 peering, connect-source, originator-id</h3>
+<p>
+  MSDP session 자체는 TCP 기반이므로,
+  라우팅 도달성과 stable endpoint(loopback)가 중요하다.
+</p>
+<ul>
+  <li><code>connect-source loopback0</code>: 세션 source를 unique Lo0로 고정한다.</li>
+  <li><code>originator-id loopback0</code>: SA의 RP-originator 식별자도 unique로 유지한다.</li>
+  <li>Anycast 주소를 peer나 originator-id로 쓰면 RPF/중복 판정이 꼬일 위험이 크다.</li>
+</ul>
+
+<h3>4-3. SA message 의미</h3>
+<p>
+  SA는 본질적으로 control 정보다.
+  핵심 필드는 <code>{ source S, group G, RP-originator R }</code>이고,
+  data encapsulation은 선택적 동작이다.
+  따라서 SA만으로 data plane이 즉시 열린다고 오해하면 안 된다.
+  SA는 “소스가 있다”는 사실을 알려,
+  수신 측 RP가 Join을 시작할 수 있게 만든다.
+</p>
+
+<h3>4-4. SA cache와 peer-RPF</h3>
+<p>
+  가장 많이 헷갈리는 지점이다.
+  <strong>MSDP의 RPF 기준은 source S가 아니라 SA 안의 originating RP 주소 R</strong>다.
+</p>
+
+<ol class="flow">
+  <li>로컬 라우팅 테이블로 RP-originator R까지의 최적 경로를 계산한다.</li>
+  <li>그 경로의 next-hop에 해당하는 MSDP peer를 peer-RPF neighbor로 정한다.</li>
+  <li>SA가 peer-RPF neighbor에서 들어오면 accept, 아니면 discard한다.</li>
+  <li>accept한 SA만 downstream peer에게 flood한다(정책/mesh-group 조건 반영).</li>
+</ol>
+
+<div class="warn">
+  <strong>왜 이 규칙이 필요한가?</strong><br>
+  SA는 source 존재를 전달하는 control advertisement이기 때문에,
+  “누가 이 advertisement를 시작했는지(RP-originator)”를 기준으로 경로 정합성을 보지 않으면
+  SA 루프/중복 확산을 통제하기 어렵다.
+</div>
+
+<h3>4-5. 주요 MSDP timer</h3>
+<table>
+  <tr>
+    <th>Timer</th>
+    <th>일반 운영 값/의미</th>
+    <th>설명</th>
+  </tr>
+  <tr>
+    <td>SA Advertisement Period</td>
+    <td>동일 (S,G) 재광고 간격 제한 (예: 60초 이내 재전송 억제)</td>
+    <td>과도한 SA 재전송 방지</td>
+  </tr>
+  <tr>
+    <td>SA-State Timer</td>
+    <td>SA cache 유지 시간</td>
+    <td>만료 시 재학습 필요</td>
+  </tr>
+  <tr>
+    <td>Hold Timer</td>
+    <td>일반 권장 75초</td>
+    <td>peer keepalive 미수신 시 세션 down 판정</td>
+  </tr>
+  <tr>
+    <td>KeepAlive</td>
+    <td>보통 60초</td>
+    <td>세션 생존 확인</td>
+  </tr>
+  <tr>
+    <td>ConnectRetry</td>
+    <td>보통 30초</td>
+    <td>TCP 재시도 주기</td>
+  </tr>
+</table>
+
+<div class="warn">
+  <strong>“SA timeout 90초”에 대한 정직한 해석</strong><br>
+  현장에서 90초 내외 값이 관찰되는 Cisco 구현이 있지만,
+  RFC 3618이 단일 고정값을 절대값으로 강제하는 것은 아니다.
+  RFC 관점에서는 <code>SG-State-Period ≥ (SA advertisement period + hold-down period)</code> 같은 관계 조건이 핵심이다.
+  실제 장비 값은 반드시 현재 NX-OS release에서 <code>show</code>로 확인해야 한다.
+</div>
+
+<h3>4-6. Mesh-group</h3>
+<p>
+  MSDP mesh-group은 SA flood 중복을 줄이기 위한 룰이다.
+  같은 mesh-group member에게서 받은 SA는 accept하되,
+  같은 mesh-group의 다른 member로 재전달하지 않는다.
+</p>
+<p>
+  이 룰이 제대로 동작하려면 mesh-group 내부가 full mesh여야 한다.
+  부분 연결이면 SA 전파 공백이 생길 수 있다.
+</p>
+
+<h3>4-7. NX-OS 설정 예시</h3>
+<div class="grid">
+  <div class="card">
+    <h3>N9K-1</h3>
+<pre><code><span class="kw">feature</span> pim
+<span class="kw">feature</span> msdp
+
+ip pim rp-address <span class="ip">5.1.1.1</span> group-list <span class="ip">239.0.0.0/8</span>
+
+ip msdp originator-id loopback0      <span class="cmt">! 1.1.1.1</span>
+ip msdp peer <span class="ip">1.1.1.2</span> connect-source loopback0
+ip msdp mesh-group ANYCAST-RP-MESH <span class="ip">1.1.1.2</span>
+
+<span class="cmt">! 선택: 보안 및 정책</span>
+ip msdp password <span class="ip">1.1.1.2</span> 7 &lt;encrypted-key&gt;
+ip msdp sa-policy <span class="ip">1.1.1.2</span> SA-IN in
+ip msdp sa-policy <span class="ip">1.1.1.2</span> SA-OUT out</code></pre>
+  </div>
+  <div class="card">
+    <h3>N9K-2</h3>
+<pre><code><span class="kw">feature</span> pim
+<span class="kw">feature</span> msdp
+
+ip pim rp-address <span class="ip">5.1.1.1</span> group-list <span class="ip">239.0.0.0/8</span>
+
+ip msdp originator-id loopback0      <span class="cmt">! 1.1.1.2</span>
+ip msdp peer <span class="ip">1.1.1.1</span> connect-source loopback0
+ip msdp mesh-group ANYCAST-RP-MESH <span class="ip">1.1.1.1</span>
+
+<span class="cmt">! 선택: 보안 및 정책</span>
+ip msdp password <span class="ip">1.1.1.1</span> 7 &lt;encrypted-key&gt;
+ip msdp sa-policy <span class="ip">1.1.1.1</span> SA-IN in
+ip msdp sa-policy <span class="ip">1.1.1.1</span> SA-OUT out</code></pre>
+  </div>
+</div>
+
+<h2 id="vpc-multicast-behavior">5. vPC 환경에서 멀티캐스트가 실제로 동작하는 방식<a class="anchor" href="#vpc-multicast-behavior">#</a></h2>
+
+<p>
+  이 섹션은 운영 장애를 줄이는 핵심이다.
+  vPC pair를 단순히 “L2 이중화”로만 보면 멀티캐스트 문제를 해석하기 어렵다.
+</p>
+
+<h3>5-1. vPC peer-link의 역할</h3>
+<ul>
+  <li>vPC VLAN 트래픽 전달 기반</li>
+  <li>BUM flooding 보조</li>
+  <li>IGMP snooping learned group 공유</li>
+  <li>multicast forwarding state 동기화에 필요한 컨트롤 정보 전달</li>
+</ul>
+
+<p>
+  결과적으로 vPC pair는 multicast 관점에서,
+  <strong>논리적으로 하나의 forwarding system처럼 상태를 양쪽에 유지</strong>하려고 동작한다.
+</p>
+
+<h3>5-2. CFS 기반 IGMP snooping 동기화 (공개 범위)</h3>
+<p>
+  공개 문서에서 확인 가능한 범위는 다음과 같다.
+  그룹 membership 공유,
+  snooping state 동기화,
+  그리고 forwarder 결정에 필요한 상태 연동이다.
+</p>
+
+<div class="note">
+  <strong>지적 정직성 메모</strong><br>
+  CFS 내부 메시지 포맷, 필드 구조, 내부 state machine 세부는 공개 문서로 완전히 확인되지 않는다.
+  본 문서는 공개 가능한 동작 결과와 show 명령 관찰 범위만 다룬다.
+</div>
+
+<h3>5-3. vPC forwarder election</h3>
+<p>
+  일반적으로 source까지의 unicast metric을 비교해 forwarding peer를 고른다.
+  metric 동률이면 vPC primary가 tie-break를 가진다.
+</p>
+
+<ul>
+  <li>forwarder peer: 해당 (S,G)에 대해 vPC OIF를 실제 보유하고 복제/전달을 담당</li>
+  <li>non-forwarder peer: state는 존재할 수 있으나 OIF가 0개일 수 있음</li>
+</ul>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 490" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>vPC forwarder election 상태 비교</title>
+<defs>
+  <marker id="arrow-d3-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+  </marker>
+  <marker id="arrow-d3-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#3fb950"/>
+  </marker>
+</defs>
+<style>
+  .d3-t{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Segoe UI','Noto Sans KR',sans-serif}
+  .d3-m{font-family:'SF Mono',Menlo,Consolas,monospace}
+</style>
+
+<!-- election input strip -->
+<rect x="170" y="18" width="520" height="72" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d3-m" x="430" y="44" text-anchor="middle" font-size="13" fill="#7ee787">(S,G) = (10.10.10.10, 239.1.1.1)</text>
+<text class="d3-t" x="430" y="66" text-anchor="middle" font-size="11.5" fill="#9198a1">source 방향 unicast metric 비교 → N9K-1 == N9K-2</text>
+<text class="d3-t" x="430" y="82" text-anchor="middle" font-size="11" fill="#9198a1">tie-break: vPC primary</text>
+
+<!-- branch split -->
+<line x1="430" y1="90" x2="430" y2="112" stroke="#30363d" stroke-width="1.5"/>
+<line x1="430" y1="112" x2="215" y2="140" stroke="#30363d" stroke-width="1.5" marker-end="url(#arrow-d3-blue)"/>
+<line x1="430" y1="112" x2="645" y2="140" stroke="#30363d" stroke-width="1.5" marker-end="url(#arrow-d3-blue)"/>
+
+<!-- left panel: N9K-1 forwarder -->
+<rect x="60" y="140" width="310" height="190" rx="6" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+<text class="d3-t" x="215" y="168" text-anchor="middle" font-size="14" font-weight="700" fill="#e6edf3">N9K-1</text>
+<rect x="90" y="180" width="250" height="26" rx="13" fill="#3fb950" fill-opacity="0.15" stroke="#3fb950" stroke-width="1"/>
+<text class="d3-t" x="215" y="197" text-anchor="middle" font-size="11.5" fill="#3fb950">primary · FORWARDER</text>
+<text class="d3-m" x="90" y="234" font-size="12.5" fill="#e6edf3">mroute (S,G):</text>
+<text class="d3-m" x="90" y="256" font-size="12" fill="#9198a1">IIF: <tspan fill="#7ee787">Eth1/49</tspan></text>
+<text class="d3-m" x="90" y="278" font-size="12" fill="#9198a1">OIF: <tspan fill="#7ee787">Po20(vPC-member), Vlan110</tspan></text>
+
+<!-- right panel: N9K-2 non-forwarder -->
+<rect x="490" y="140" width="310" height="190" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d3-t" x="645" y="168" text-anchor="middle" font-size="14" font-weight="700" fill="#e6edf3">N9K-2</text>
+<rect x="520" y="180" width="250" height="26" rx="13" fill="#9198a1" fill-opacity="0.15" stroke="#9198a1" stroke-width="1"/>
+<text class="d3-t" x="645" y="197" text-anchor="middle" font-size="11.5" fill="#9198a1">secondary · NON-FORWARDER</text>
+<text class="d3-m" x="520" y="234" font-size="12.5" fill="#e6edf3">mroute (S,G):</text>
+<text class="d3-m" x="520" y="256" font-size="12" fill="#9198a1">IIF: <tspan fill="#7ee787">Eth1/49</tspan></text>
+<text class="d3-m" x="520" y="278" font-size="12" fill="#9198a1">OIF: <tspan fill="#9198a1">[none]</tspan></text>
+
+<!-- forwarding arrow to receiver -->
+<line x1="215" y1="330" x2="215" y2="352" stroke="#3fb950" stroke-width="1.5"/>
+<line x1="215" y1="352" x2="185" y2="392" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arrow-d3-green)"/>
+<rect x="150" y="400" width="150" height="40" rx="6" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+<text class="d3-t" x="225" y="424" text-anchor="middle" font-size="13" fill="#e6edf3">Receiver</text>
+<rect x="120" y="358" width="76" height="18" fill="#0b0f14"/>
+<text class="d3-t" x="158" y="372" text-anchor="middle" font-size="10.5" fill="#3fb950">실제 전달</text>
+
+<!-- non-forwarding stub -->
+<line x1="645" y1="330" x2="645" y2="368" stroke="#9198a1" stroke-width="1.5" stroke-dasharray="4 4"/>
+<line x1="636" y1="368" x2="654" y2="386" stroke="#9198a1" stroke-width="2"/>
+<line x1="654" y1="368" x2="636" y2="386" stroke="#9198a1" stroke-width="2"/>
+<text class="d3-t" x="645" y="402" text-anchor="middle" font-size="10.5" fill="#9198a1">전달 없음</text>
+
+<!-- amber callout -->
+<rect x="60" y="448" width="740" height="34" rx="6" fill="#d29922" fill-opacity="0.1" stroke="#d29922" stroke-width="1.5"/>
+<text class="d3-t" x="430" y="470" text-anchor="middle" font-size="12" fill="#d29922">OIF 0 = 정상일 수 있음. forwarder election 결과이지 장애가 아님.</text>
+</svg>
+<figcaption>vPC forwarder election — state는 양쪽, forwarding ownership은 한쪽</figcaption>
+</figure>
+
+<h3>5-4. 핵심 개념: state 동기화와 forwarding 소유권은 다르다</h3>
+<div class="warn">
+  <strong>중요</strong><br>
+  <b>state가 양쪽에 존재</b>하는 것과,
+  <b>양쪽이 동시에 forward</b>하는 것은 동일한 의미가 아니다.
+  State synchronization ≠ forwarding ownership.
+</div>
+
+<h3>5-5. Receiver가 vPC에 연결된 경우 처리 순서</h3>
+<ol class="flow">
+  <li>Receiver host가 IGMP Report를 보낸다.</li>
+  <li>Local peer가 IGMP snooping entry를 학습한다.</li>
+  <li>peer-link/CFS를 통해 반대 peer와 그룹 상태를 동기화한다.</li>
+  <li>양쪽 모두 multicast 관련 state를 가진다.</li>
+  <li>forwarder election 결과 한 peer가 forwarding ownership을 가진다.</li>
+  <li>선택되지 않은 peer는 중복 전송을 하지 않아 duplicate delivery를 방지한다.</li>
+</ol>
+
+<h3>5-6. Source가 vPC port-channel에 연결된 경우</h3>
+<p>
+  이 케이스는 control-plane과 data-plane ownership이 어긋나기 쉬운 지점이다.
+  소스가 vPC port-channel 뒤에 있으면,
+  두 peer가 source를 local로 인식할 가능성이 있다.
+</p>
+<ul>
+  <li>duplicate Register 가능성</li>
+  <li>MSDP 사용 시 duplicate SA 가능성</li>
+  <li>forwarding owner와 registration owner 불일치 위험</li>
+</ul>
+
+<div class="danger-box">
+  <strong>반드시 명시해야 할 사실</strong><br>
+  모든 NX-OS release에서 “vPC source는 반드시 한 peer만 Register한다”는 일반 규칙을
+  Cisco 공식 문서로 단정하기 어렵다.
+  실제 Register originator는
+  <code>show ip pim internal event-history null-register</code>,
+  패킷 캡처, 플랫폼별 event-history로 검증해야 한다.
+</div>
+
+<h3>5-7. peer-link와 multicast RPF 관계</h3>
+<table>
+  <tr><th>항목</th><th>peer-link에서의 해석</th></tr>
+  <tr><td>vPC peer state 동기화</td><td>가능</td></tr>
+  <tr><td>IGMP snooping state 공유</td><td>가능</td></tr>
+  <tr><td>vPC multicast flooding/replication</td><td>release·platform 의존</td></tr>
+  <tr><td>임의 downstream router와 PIM adjacency</td><td><strong>지원되지 않음</strong></td></tr>
+  <tr><td>일반 multicast RPF path로 사용</td><td>일반 설계로 사용 안 함</td></tr>
+</table>
+
+<p>
+  현장에서 자주 오해하는 문구가 “peer-link is not used for multicast RPF”이다.
+  이 문구는
+  “peer-link를 통한 state 동기화 자체를 금지”한다는 뜻이 아니라,
+  <strong>PIM control-plane adjacency와 RPF topology를 peer-link에 의존하지 말라</strong>는 뜻이다.
+</p>
+
+<div class="note">
+  <strong>NX-OS 제약 정리</strong><br>
+  vPC VLAN SVI와 downstream device 간 PIM adjacency는 일반적으로 지원되지 않으며,
+  vPC SVI에서는 vPC peer 간 adjacency만 지원되는 형태로 문서화된다.
+  상세 지원 범위는 플랫폼/릴리스별 guide를 반드시 확인해야 한다.
+</div>
+
+<h2 id="rp-placement">6. RP를 어디에 둘 것인가 — vPC pair 내부 vs 외부<a class="anchor" href="#rp-placement">#</a></h2>
+
+<h3>6-1. vPC pair 자체가 RP인 경우 겹치는 역할</h3>
+<p>
+  vPC pair 내부 RP 설계는 기능적으로 가능하지만,
+  한 장비에 다음 역할이 겹친다.
+</p>
+<ul>
+  <li>vPC state 동기화</li>
+  <li>Anycast-RP state 동기화(PIM Register copy 또는 MSDP SA)</li>
+  <li>DR/Register 처리</li>
+  <li>forwarder election</li>
+  <li>shared-tree 처리와 source state 관리</li>
+</ul>
+
+<p>
+  역할이 겹칠수록 장애 시 해석이 어려워지고,
+  원인 분리가 늦어질 수 있다.
+</p>
+
+<h3>6-2. Cisco가 경고하는 위험 시나리오</h3>
+<div class="danger-box">
+  <strong>위험 시나리오</strong><br>
+  source VRF 트래픽이 non-forwarder vPC peer(그리고 그 장비가 RP)로 유입되면,
+  forwarding owner peer에 (S,G) entry가 즉시 생성되지 않아 drop이 발생할 수 있다.
+  Cisco 문서에서 이 토폴로지 위험이 언급되며,
+  Anycast-RP 구성을 명시적으로 권고하는 배경이 된다.
+</div>
+
+<h3>6-3. vPC pair 내부 RP 배치 시 최소 5가지 조건</h3>
+<ol>
+  <li>Anycast 주소/unique 주소 분리(Lo1=5.1.1.1, Lo0=1.1.1.1/1.1.1.2) 엄수</li>
+  <li>PIM Anycast-RP set 또는 MSDP peer/originator-id를 양쪽 완전 대칭으로 구성</li>
+  <li><code>ip pim pre-build-spt</code> 적용 여부를 장애 복구 목표(RTO) 기준으로 사전 판단</li>
+  <li>소스/리시버가 vPC 뒤에 있을 때 forwarder election 결과를 운영 대시보드로 상시 가시화</li>
+  <li>peer-link 및 keepalive 장애 조합 시 시나리오 테스트(랩/점검창) 수행</li>
+</ol>
+
+<h3>6-4. RP를 외부(spine 등)에 두는 권장 모델</h3>
+<figure class="diagram">
+<svg viewBox="0 0 820 560" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>RP 역할(spine)과 vPC forwarding 역할(leaf) 분리 모델</title>
+<defs>
+  <marker id="arrow-d4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+  </marker>
+</defs>
+<style>
+  .d4-t{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Segoe UI','Noto Sans KR',sans-serif}
+  .d4-m{font-family:'SF Mono',Menlo,Consolas,monospace}
+</style>
+
+<!-- spine tier group -->
+<rect x="60" y="20" width="700" height="130" rx="10" fill="#3fb950" fill-opacity="0.04" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text class="d4-t" x="80" y="44" font-size="13" font-weight="700" fill="#3fb950">Anycast RP set (RP 역할)</text>
+
+<rect x="110" y="55" width="280" height="82" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d4-t" x="250" y="79" text-anchor="middle" font-size="14" font-weight="700" fill="#e6edf3">Spine RP-1</text>
+<text class="d4-m" x="250" y="100" text-anchor="middle" font-size="11.5" fill="#9198a1">Lo0: <tspan fill="#7ee787">11.11.11.11</tspan></text>
+<text class="d4-m" x="250" y="120" text-anchor="middle" font-size="11.5" fill="#3fb950">Lo1: 5.1.1.1 (Anycast)</text>
+
+<rect x="430" y="55" width="280" height="82" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d4-t" x="570" y="79" text-anchor="middle" font-size="14" font-weight="700" fill="#e6edf3">Spine RP-2</text>
+<text class="d4-m" x="570" y="100" text-anchor="middle" font-size="11.5" fill="#9198a1">Lo0: <tspan fill="#7ee787">11.11.11.12</tspan></text>
+<text class="d4-m" x="570" y="120" text-anchor="middle" font-size="11.5" fill="#3fb950">Lo1: 5.1.1.1 (Anycast)</text>
+
+<!-- mesh links spine-leaf -->
+<line x1="250" y1="137" x2="250" y2="380" stroke="#30363d" stroke-width="1.5" marker-end="url(#arrow-d4)"/>
+<line x1="250" y1="137" x2="570" y2="380" stroke="#30363d" stroke-width="1.5"/>
+<line x1="570" y1="137" x2="250" y2="380" stroke="#30363d" stroke-width="1.5"/>
+<line x1="570" y1="137" x2="570" y2="380" stroke="#30363d" stroke-width="1.5"/>
+<rect x="200" y="248" width="100" height="18" fill="#0b0f14"/>
+<text class="d4-m" x="250" y="262" text-anchor="middle" font-size="11" fill="#58a6ff">IGP + PIM</text>
+
+<!-- vpc pair group -->
+<rect x="60" y="340" width="700" height="140" rx="10" fill="#58a6ff" fill-opacity="0.04" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text class="d4-t" x="80" y="362" font-size="13" font-weight="700" fill="#58a6ff">vPC Pair (forwarding 역할)</text>
+
+<rect x="110" y="380" width="280" height="80" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d4-t" x="250" y="415" text-anchor="middle" font-size="14" font-weight="700" fill="#e6edf3">N9K-1 (vPC primary)</text>
+<text class="d4-t" x="250" y="435" text-anchor="middle" font-size="11.5" fill="#9198a1">forwarding node</text>
+
+<rect x="430" y="380" width="280" height="80" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d4-t" x="570" y="415" text-anchor="middle" font-size="14" font-weight="700" fill="#e6edf3">N9K-2 (vPC secondary)</text>
+<text class="d4-t" x="570" y="435" text-anchor="middle" font-size="11.5" fill="#9198a1">forwarding node</text>
+
+<!-- peer link -->
+<line x1="390" y1="420" x2="430" y2="420" stroke="#58a6ff" stroke-width="3"/>
+<rect x="345" y="410" width="130" height="18" fill="#0b0f14"/>
+<text class="d4-m" x="410" y="424" text-anchor="middle" font-size="11" fill="#58a6ff">Po1 (peer-link)</text>
+
+<!-- access nodes -->
+<rect x="110" y="500" width="130" height="40" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d4-t" x="175" y="524" text-anchor="middle" font-size="13" fill="#e6edf3">Source</text>
+<line x1="175" y1="460" x2="175" y2="500" stroke="#30363d" stroke-width="1.5"/>
+<rect x="117" y="470" width="120" height="18" fill="#0b0f14"/>
+<text class="d4-m" x="177" y="484" text-anchor="middle" font-size="10.5" fill="#9198a1">vPC member port</text>
+
+<rect x="580" y="500" width="130" height="40" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text class="d4-t" x="645" y="524" text-anchor="middle" font-size="13" fill="#e6edf3">Receiver</text>
+<line x1="645" y1="460" x2="645" y2="500" stroke="#30363d" stroke-width="1.5"/>
+<rect x="585" y="470" width="120" height="18" fill="#0b0f14"/>
+<text class="d4-m" x="645" y="484" text-anchor="middle" font-size="10.5" fill="#9198a1">vPC member port</text>
+</svg>
+<figcaption>권장 모델 — RP 역할(spine)과 vPC forwarding 역할(leaf)의 분리</figcaption>
+</figure>
+
+<p>장점:</p>
+<ul>
+  <li>RP 역할과 vPC forwarding 역할을 분리해 장애 도메인 축소</li>
+  <li>leaf pair의 로컬 이벤트가 RP 제어 평면에 직접 결합되는 정도 감소</li>
+  <li>트러블슈팅 경로 명확화(leaf 문제 vs RP 문제 분리)</li>
+  <li>TRM/EVPN 확장 시 spine 기반 정책 일관성 확보 용이</li>
+</ul>
+
+<h2 id="pre-build-spt">7. <code>ip pim pre-build-spt</code><a class="anchor" href="#pre-build-spt">#</a></h2>
+
+<p>
+  vPC에서 forwarder만 upstream (S,G) Join을 보내는 기본 동작일 때,
+  forwarder 장애가 발생하면 non-forwarder가 즉시 수신 준비가 안 되어 수렴이 느려질 수 있다.
+</p>
+
+<h3>문제 상황</h3>
+<ul>
+  <li>정상 시 non-forwarder의 (S,G) OIF가 0인 구조</li>
+  <li>forwarder 장애 시 대체 peer가 upstream Join을 새로 시작</li>
+  <li>이 간격이 서비스 packet-loss window를 만든다</li>
+</ul>
+
+<h3>동작 원리</h3>
+<p>
+  <code>ip pim pre-build-spt</code>를 쓰면,
+  OIF가 0개인 상태에서도 source 방향 Join을 미리 보내
+  standby 성격의 SPT state를 사전 구축한다.
+</p>
+
+<h3>장점 3가지</h3>
+<ol>
+  <li>forwarder 장애 시 Join 재구축 지연 감소</li>
+  <li>수렴 예측 가능성 향상(장애 테스트 편차 감소)</li>
+  <li>vPC source/receiver 혼재 구간에서 failover 체감 품질 개선</li>
+</ol>
+
+<h3>단점 2가지</h3>
+<ol>
+  <li>upstream 관점에서 중복 join/path 유지로 control/data 오버헤드 증가 가능</li>
+  <li>대규모 환경에서 대역폭/포워딩 리소스 사용량 증가 가능</li>
+</ol>
+
+<div class="tip">
+  <strong>운영 결론</strong><br>
+  Cisco vPC best-practice 맥락에서는,
+  다수 환경에서 수렴 이득이 대역폭 비용보다 크다고 보고
+  <code>pre-build-spt</code>를 권장하는 방향을 제시한다.
+  단, 실제 적용은 트래픽 패턴과 하드웨어 여유도를 함께 평가해야 한다.
+</div>
+
+<h3>설정 예시</h3>
+<pre><code><span class="kw">feature</span> pim
+
+<span class="kw">ip pim</span> pre-build-spt
+
+<span class="cmt">! VRF 별 적용이 필요한 릴리스에서는 다음과 같이 확인/적용</span>
+show running-config pim
+show ip pim vrf PROD ?</code></pre>
+
+<h2 id="failure-scenarios">8. 장애 시나리오별 동작 분석<a class="anchor" href="#failure-scenarios">#</a></h2>
+
+<h3>8-1. peer-link만 다운 (keepalive 정상)</h3>
+<table>
+  <tr><th>항목</th><th>영향</th><th>해석 포인트</th></tr>
+  <tr><td>vPC secondary</td><td>일반적으로 vPC member suspend</td><td>dual-active 방지 목적</td></tr>
+  <tr><td>state sync</td><td>중단</td><td>IGMP/multicast 동기화 경로 단절</td></tr>
+  <tr><td>orphan port</td><td>설계에 따라 생존 가능</td><td>서비스 영향 범위가 포트 유형별로 다름</td></tr>
+  <tr><td>멀티캐스트</td><td>receiver 위치/포트 유형 의존</td><td>단일 결론보다 경로별 확인 필요</td></tr>
+</table>
+
+<p>확인 명령:</p>
+<pre><code>show vpc
+show vpc role
+show vpc peer-keepalive
+show vpc consistency-parameters
+show ip igmp snooping vpc
+show ip mroute detail</code></pre>
+
+<h3>8-2. vPC peer 장비 전체 장애</h3>
+<p>
+  surviving peer가 forwarding을 이어받는다.
+  이때 <code>pre-build-spt</code> 유무가 실제 수렴 체감에 큰 차이를 만든다.
+</p>
+<ul>
+  <li>RP가 외부면: peer 장애와 RP 기능 장애를 분리 가능</li>
+  <li>RP가 vPC pair 내부면: peer 장애가 곧 RP 가용성 이슈로 번질 수 있음</li>
+</ul>
+
+<h3>8-3. keepalive만 다운</h3>
+<p>
+  keepalive 경로만 손실되면 peer liveness 판단이 어긋날 수 있다.
+  split-brain 방지 동작은 role, peer-gateway, auto-recovery, dual-active detection 등
+  복합 요소에 의존한다.
+</p>
+
+<div class="note">
+  <strong>검증 한계 명시</strong><br>
+  keepalive-only failure의 protocol별 상세 sequence를
+  모든 플랫폼/릴리스에 공통으로 단정할 수준의 공개 문서를 확보하기 어렵다.
+  운영 환경에서는 해당 릴리스의 공식 가이드 + 랩 재현으로 검증해야 한다.
+</div>
+
+<h3>8-4. RP 노드 reload 비교 (PIM Anycast-RP vs MSDP)</h3>
+<div class="grid">
+  <div class="card">
+    <h3>PIM Anycast-RP 케이스 (6단계)</h3>
+    <ol>
+      <li>RP1 reload 시작, Anycast route 일부 철회</li>
+      <li>IGP 수렴으로 DR/LHR이 RP2 경로로 이동</li>
+      <li>새 Register가 RP2로 유입</li>
+      <li>RP2가 (S,G) 유지/재생성</li>
+      <li>RP1 복구 후 Anycast route 재광고</li>
+      <li>traffic은 IGP metric 기반으로 재분산</li>
+    </ol>
+  </div>
+  <div class="card">
+    <h3>MSDP 케이스 (6단계)</h3>
+    <ol>
+      <li>RP1 reload로 MSDP TCP session down</li>
+      <li>peer hold timer 경과 후 RP2가 peer down 인지</li>
+      <li>SA 유효성/캐시 만료 정책에 따라 source 정보 일부 소실 가능</li>
+      <li>새 Register/SA 재광고로 cache 재학습</li>
+      <li>RP1 복구 시 TCP 639 재수립 + SA 교환 재개</li>
+      <li>정상화 속도는 timer와 session detection에 영향</li>
+    </ol>
+  </div>
+</div>
+
+<h3>8-5. 수렴 속도 비교 결론</h3>
+<p>
+  intra-domain NX-OS 환경에서는,
+  PIM Anycast-RP가 MSDP의 TCP session/SA flood 계층 없이
+  IGP 수렴 중심으로 경로가 바뀌므로 일반적으로 더 단순하고 빠르게 운영되는 경향이 있다.
+</p>
+
+<div class="note">
+  <strong>정량 해석 주의</strong><br>
+  실제 packet-loss window는 IGP convergence,
+  PIM Join-Prune timer,
+  Register refresh,
+  MSDP TCP failure detection,
+  SA cache lifetime,
+  vPC forwarder election,
+  pre-build-spt 적용 여부가 함께 결정한다.
+  이는 RFC 동작과 Cisco 설계 권고에 기반한 일반 판단이며,
+  Cisco가 모든 토폴로지에 대해 단일 정량 수치를 보장한다는 의미는 아니다.
+</div>
+
+<h2 id="comparison-matrix">9. 종합 비교 매트릭스<a class="anchor" href="#comparison-matrix">#</a></h2>
+
+<table>
+  <tr>
+    <th>비교 축</th>
+    <th>PIM Anycast-RP (RFC 4610)</th>
+    <th>MSDP Anycast-RP (RFC 3446/3618)</th>
+  </tr>
+  <tr>
+    <td>표준/근거</td>
+    <td>RFC 4610</td>
+    <td>RFC 3446 + RFC 3618</td>
+  </tr>
+  <tr>
+    <td>source 동기화 방식</td>
+    <td>Register copy</td>
+    <td>SA advertisement</td>
+  </tr>
+  <tr>
+    <td>추가 protocol</td>
+    <td>추가 없음(PIM 내부)</td>
+    <td>MSDP over TCP 639</td>
+  </tr>
+  <tr>
+    <td>state 유지 방식</td>
+    <td>Register 이벤트 기반 재생성</td>
+    <td>SA cache + timer 기반</td>
+  </tr>
+  <tr>
+    <td>최초 source 지연</td>
+    <td>가까운 RP 도달 후 복제</td>
+    <td>가까운 RP + SA 전파 지연 추가</td>
+  </tr>
+  <tr>
+    <td>정상 상태 오버헤드</td>
+    <td>상대적으로 낮음</td>
+    <td>KeepAlive/SA 관리 오버헤드 존재</td>
+  </tr>
+  <tr>
+    <td>RP 확장성</td>
+    <td>도메인 내부 확장 양호</td>
+    <td>대규모 시 mesh-group/정책 설계 필요</td>
+  </tr>
+  <tr>
+    <td>inter-domain</td>
+    <td>제한적/비권장</td>
+    <td>적합</td>
+  </tr>
+  <tr>
+    <td>멀티벤더</td>
+    <td>RFC 4610 구현 의존</td>
+    <td>상대적으로 보편적</td>
+  </tr>
+  <tr>
+    <td>peer-RPF 개념</td>
+    <td>핵심 이슈 아님</td>
+    <td>핵심(Originating RP 기준)</td>
+  </tr>
+  <tr>
+    <td>mesh-group</td>
+    <td>불필요</td>
+    <td>권장(특히 3노드 이상)</td>
+  </tr>
+  <tr>
+    <td>보안</td>
+    <td>PIM 수준 보호</td>
+    <td>TCP MD5 + SA filter 가능</td>
+  </tr>
+  <tr>
+    <td>unique 주소 요구</td>
+    <td>필수(Loop prevention 위해)</td>
+    <td>필수(originator-id/peer-RPF 위해)</td>
+  </tr>
+  <tr>
+    <td>vPC pair가 RP일 때</td>
+    <td>단순하지만 forwarder 연계 검증 필수</td>
+    <td>복잡도 상승 + peer-RPF 검증 추가</td>
+  </tr>
+  <tr>
+    <td>VXLAN EVPN TRM</td>
+    <td>underlay에서 일반 권장</td>
+    <td>외부 RP 연동 시 선택 가능</td>
+  </tr>
+  <tr>
+    <td>트러블슈팅 도구</td>
+    <td>pim event-history, mroute</td>
+    <td>msdp summary/sa-cache/statistics 필수</td>
+  </tr>
+  <tr>
+    <td>흔한 장애 원인</td>
+    <td>Anycast set 불일치, Lo1 PIM 누락</td>
+    <td>originator-id/peer 주소 오구성, peer-RPF mismatch</td>
+  </tr>
+  <tr>
+    <td>설정 복잡도</td>
+    <td>낮음</td>
+    <td>중간~높음</td>
+  </tr>
+</table>
+
+<h2 id="vxlan-trm">10. VXLAN EVPN TRM 과의 관계<a class="anchor" href="#vxlan-trm">#</a></h2>
+
+<h3>underlay RP</h3>
+<p>
+  TRM 설계에서 underlay RP는 일반적으로 spine 배치 + PIM Anycast-RP가 선호된다.
+  leaf(vPC pair)에서 RP 기능을 분리해 장애 도메인을 줄이기 쉽기 때문이다.
+</p>
+
+<h3>overlay 모델</h3>
+<ul>
+  <li>RP Everywhere</li>
+  <li>External RP</li>
+</ul>
+
+<p>
+  overlay 정책과 underlay RP 정책이 다를 수 있으므로,
+  한쪽 관점만 보고 전체 경로를 단정하면 안 된다.
+</p>
+
+<h3>외부 IOS/IOS-XE/IOS-XR RP 연동</h3>
+<p>
+  외부 도메인과 SA 교환이 필요한 경우 Anycast MSDP가 필요할 수 있다.
+  이때 peer-RPF와 정책 필터를 포함한 MSDP 설계를 별도로 검증해야 한다.
+</p>
+
+<h3>vPC border leaf 주의사항</h3>
+<ul>
+  <li>platform/release별 지원 범위 확인 필수</li>
+  <li><code>advertise-pip</code>, <code>advertise virtual-rmac</code> 같은 EVPN 옵션과의 조합 검토</li>
+  <li>vPC peer 뒤 L3 source/receiver 지원을 위해 physical VRF-lite link가 필요한 토폴로지가 존재</li>
+  <li>peer-link만으로 L3 multicast reachability를 가정하지 말 것</li>
+</ul>
+
+<div class="note">
+  <strong>현실적인 운영 포인트</strong><br>
+  TRM은 underlay/overlay/vPC 제약이 동시에 얽힌다.
+  반드시 “현재 운영 릴리스의 해당 플랫폼 가이드”로 교차 확인해야 한다.
+</div>
+
+<h2 id="verification-troubleshooting">11. 검증 및 트러블슈팅 명령어<a class="anchor" href="#verification-troubleshooting">#</a></h2>
+
+<h3>11-1. RP / Anycast-RP 기본 확인</h3>
+<pre><code>show ip pim rp
+show running-config pim
+show running-config interface loopback0
+show running-config interface loopback1</code></pre>
+
+<p>정상이면 다음이 확인된다.</p>
+<ul>
+  <li><code>rp-address 5.1.1.1 group-list 239.0.0.0/8</code> 존재</li>
+  <li>Lo0/Lo1 모두 <code>ip pim sparse-mode</code> 적용</li>
+  <li>PIM Anycast-RP인 경우 set member에 <code>1.1.1.1</code>, <code>1.1.1.2</code>가 동일하게 보임</li>
+</ul>
+
+<h3>11-2. PIM Register 이벤트 확인</h3>
+<pre><code>show ip pim internal event-history null-register</code></pre>
+
+<p>정상 패턴 예시:</p>
+<pre><code>[time] Received Register for (10.10.10.10, 239.1.1.1)
+[time] Create route for (10.10.10.10, 239.1.1.1)
+[time] RP is an Anycast-RP
+[time] Forward Register to Anycast-RP member 1.1.1.2
+[time] Send Register-Stop to DR 10.10.10.1</code></pre>
+
+<h3>11-3. MSDP 상태 확인</h3>
+<pre><code>show ip msdp summary
+show ip msdp peer
+show ip msdp sa-cache
+show ip msdp statistics</code></pre>
+
+<p>정상 체크리스트:</p>
+<ul>
+  <li><code>State = Established</code></li>
+  <li>peer address가 Anycast(<code>5.1.1.1</code>)가 아닌 unique loopback(<code>1.1.1.1</code>/<code>1.1.1.2</code>)</li>
+  <li><code>originator-id</code>가 유니크</li>
+  <li>SA cache에 유효한 (S,G) 존재</li>
+  <li>accepted counter 증가</li>
+  <li>duplicate RP address/peer-RPF discard counter 비정상 급증 없음</li>
+</ul>
+
+<h3>11-4. mroute 확인</h3>
+<pre><code>show ip mroute
+show ip mroute detail
+show ip mroute vrf PROD</code></pre>
+
+<div class="note">
+  <strong>해석 팁</strong><br>
+  vPC에서 non-forwarder의 (S,G) OIF가 0으로 보이는 것은
+  설계상 정상일 수 있다.
+  OIF 0만으로 즉시 장애 판정하지 말고,
+  forwarder peer와 IGMP/VPC 상태를 함께 보라.
+</div>
+
+<h3>11-5. vPC / IGMP snooping</h3>
+<pre><code>show vpc
+show vpc consistency-parameters
+show vpc role
+show vpc peer-keepalive
+show ip igmp snooping vpc
+show ip igmp snooping groups</code></pre>
+
+<h3>11-6. 하드웨어 포워딩 확인</h3>
+<pre><code>show forwarding distribution multicast route</code></pre>
+
+<h3>11-7. DF 관련</h3>
+<pre><code>show ip pim vrf &lt;vrf&gt; df
+show ip pim vrf &lt;vrf&gt; ?</code></pre>
+
+<p>
+  릴리스에 따라 출력 필드 차이가 있을 수 있으므로,
+  도움말과 configuration guide를 같이 보는 습관이 필요하다.
+</p>
+
+<h2 id="common-errors">12. 자주 발생하는 설정 오류 10선<a class="anchor" href="#common-errors">#</a></h2>
+
+<h3>1) Anycast 주소와 unique 주소를 동일하게 사용</h3>
+<p><strong>증상:</strong> Register/SA loop-prevention 또는 RPF 판정 이상, 상태 불안정</p>
+<pre><code><span class="cmt">! 잘못된 설정</span>
+<span class="kw">interface</span> loopback0
+  ip address <span class="ip">5.1.1.1/32</span>
+<span class="kw">interface</span> loopback1
+  ip address <span class="ip">5.1.1.1/32</span></code></pre>
+<p><strong>원인:</strong> Anycast 식별자와 unique 식별자가 충돌</p>
+<pre><code><span class="cmt">! 올바른 설정</span>
+<span class="kw">interface</span> loopback0
+  ip address <span class="ip">1.1.1.1/32</span>   <span class="cmt">! N9K-2는 1.1.1.2</span>
+<span class="kw">interface</span> loopback1
+  ip address <span class="ip">5.1.1.1/32</span></code></pre>
+
+<h3>2) Anycast RP loopback에 <code>ip pim sparse-mode</code> 누락</h3>
+<p><strong>증상:</strong> RP 주소는 보이지만 Register 처리 실패</p>
+<pre><code><span class="cmt">! 잘못된 설정</span>
+<span class="kw">interface</span> loopback1
+  ip address <span class="ip">5.1.1.1/32</span>
+  ip router ospf 10 area 0</code></pre>
+<p><strong>원인:</strong> RP 인터페이스에서 PIM 미활성</p>
+<pre><code><span class="cmt">! 올바른 설정</span>
+<span class="kw">interface</span> loopback1
+  ip address <span class="ip">5.1.1.1/32</span>
+  ip router ospf 10 area 0
+  ip pim sparse-mode</code></pre>
+
+<h3>3) <code>ip msdp originator-id</code>를 Anycast 주소로 설정 <span class="badge">가장 흔한 오류</span></h3>
+<p><strong>증상:</strong> MSDP 세션은 Established인데 SA discard 증가, SA cache 비정상</p>
+<pre><code><span class="cmt">! 잘못된 설정</span>
+ip msdp originator-id <span class="ip">5.1.1.1</span></code></pre>
+<p><strong>원인:</strong> duplicate RP address detection / peer-RPF 판정 충돌</p>
+<pre><code><span class="cmt">! 올바른 설정</span>
+ip msdp originator-id loopback0   <span class="cmt">! 1.1.1.1 또는 1.1.1.2</span></code></pre>
+
+<h3>4) MSDP peer 주소에 Anycast 주소 사용</h3>
+<p><strong>증상:</strong> 세션 flap 또는 비정상 RPF 동작</p>
+<pre><code><span class="cmt">! 잘못된 설정</span>
+ip msdp peer <span class="ip">5.1.1.1</span> connect-source loopback0</code></pre>
+<p><strong>원인:</strong> peer endpoint는 고정 unique여야 함</p>
+<pre><code><span class="cmt">! 올바른 설정</span>
+ip msdp peer <span class="ip">1.1.1.2</span> connect-source loopback0   <span class="cmt">! N9K-1 기준</span></code></pre>
+
+<h3>5) MSDP peer-RPF mismatch</h3>
+<p><strong>증상:</strong> session Established, 그러나 SA accepted counter 증가 없음 / SA cache 비어 있음</p>
+<pre><code><span class="cmt">! 확인 명령</span>
+show ip msdp summary
+show ip msdp peer
+show ip msdp sa-cache
+show ip route 1.1.1.2
+show ip msdp statistics</code></pre>
+<p><strong>원인:</strong> originator까지 최적경로와 SA 유입 peer 불일치</p>
+<pre><code><span class="cmt">! 올바른 방향: 경로/피어 정합성 맞춤</span>
+<span class="cmt">! (예) IGP cost 수정 또는 MSDP 피어 재구성</span>
+ip router ospf 10
+  auto-cost reference-bandwidth 100000</code></pre>
+
+<h3>6) Anycast-RP set 설정 불일치</h3>
+<p><strong>증상:</strong> 단방향 Register 복제, 일부 RP만 state 보유</p>
+<pre><code><span class="cmt">! 잘못된 설정 (N9K-1에만 1.1.1.2 추가, N9K-2는 누락)</span>
+ip pim anycast-rp <span class="ip">5.1.1.1</span> <span class="ip">1.1.1.1</span></code></pre>
+<p><strong>원인:</strong> RP set 비대칭</p>
+<pre><code><span class="cmt">! 올바른 설정 (양쪽 동일)</span>
+ip pim anycast-rp <span class="ip">5.1.1.1</span> <span class="ip">1.1.1.1</span>
+ip pim anycast-rp <span class="ip">5.1.1.1</span> <span class="ip">1.1.1.2</span></code></pre>
+
+<h3>7) 두 방식(PIM Anycast-RP + MSDP) 동시 활성화</h3>
+<p><strong>증상:</strong> 중복 source discovery, 분석 경로 모호화</p>
+<pre><code><span class="cmt">! 혼합 상태 예시</span>
+ip pim anycast-rp <span class="ip">5.1.1.1</span> <span class="ip">1.1.1.2</span>
+ip msdp peer <span class="ip">1.1.1.2</span> connect-source loopback0</code></pre>
+<p><strong>원인:</strong> 동일 목적의 두 메커니즘 중복</p>
+<pre><code><span class="cmt">! 올바른 설정: 설계 의도에 따라 하나만 선택</span>
+no ip msdp peer <span class="ip">1.1.1.2</span>
+<span class="cmt">! 또는</span>
+no ip pim anycast-rp <span class="ip">5.1.1.1</span> <span class="ip">1.1.1.2</span></code></pre>
+
+<h3>8) vPC peer-link를 PIM adjacency path로 사용하려는 시도</h3>
+<p><strong>증상:</strong> adjacency 미형성, RPF 오해</p>
+<pre><code><span class="cmt">! 잘못된 가정: peer-link를 외부 라우터 인접 경로로 활용</span>
+<span class="kw">interface</span> port-channel1
+  ip pim sparse-mode   <span class="cmt">! 설계 의도 불일치</span></code></pre>
+<p><strong>원인:</strong> peer-link 역할 오해</p>
+<pre><code><span class="cmt">! 올바른 방향: 외부 라우터와는 별도 L3 링크에서 PIM adjacency</span>
+<span class="kw">interface</span> Ethernet1/49
+  ip address <span class="ip">172.16.0.1/31</span>
+  ip pim sparse-mode</code></pre>
+
+<h3>9) <code>pre-build-spt</code> 누락으로 장애 시 수렴 지연</h3>
+<p><strong>증상:</strong> forwarder failover 시 수신 복구 지연</p>
+<pre><code><span class="cmt">! 누락 상태</span>
+show running-config pim</code></pre>
+<p><strong>원인:</strong> 대체 peer의 upstream (S,G) Join 사전 준비 부족</p>
+<pre><code><span class="cmt">! 올바른 설정</span>
+ip pim pre-build-spt</code></pre>
+
+<h3>10) RP가 non-forwarder peer인 토폴로지</h3>
+<p><strong>증상:</strong> 특정 source/VRF에서 간헐 drop, state는 있어 보이는데 전달 실패</p>
+<pre><code><span class="cmt">! 문제 관찰 명령</span>
+show ip mroute detail
+show ip pim internal event-history null-register
+show forwarding distribution multicast route</code></pre>
+<p><strong>원인:</strong> registration owner와 forwarding owner 비정합</p>
+<pre><code><span class="cmt">! 완화 방향</span>
+ip pim pre-build-spt
+<span class="cmt">! 또는 RP를 spine external Anycast-RP로 분리</span></code></pre>
+
+<h2 id="design-decision-guide">13. 설계 의사결정 가이드<a class="anchor" href="#design-decision-guide">#</a></h2>
+
+<h3>PIM Anycast-RP를 선택하는 조건</h3>
+<ul>
+  <li>모든 RP가 NX-OS 또는 RFC 4610 상호운용이 검증된 동일 도메인 장비</li>
+  <li>inter-domain SA 교환 요구가 없음</li>
+  <li>운영 단순성/수렴 속도를 최우선으로 둠</li>
+  <li>트러블슈팅 경로를 PIM 중심으로 단순화하고 싶음</li>
+</ul>
+
+<pre><code><span class="cmt">! 권장 구조(예)</span>
+ip pim rp-address <span class="ip">5.1.1.1</span> group-list <span class="ip">239.0.0.0/8</span>
+ip pim anycast-rp <span class="ip">5.1.1.1</span> <span class="ip">1.1.1.1</span>
+ip pim anycast-rp <span class="ip">5.1.1.1</span> <span class="ip">1.1.1.2</span>
+ip pim pre-build-spt</code></pre>
+
+<h3>MSDP Anycast-RP를 선택하는 조건</h3>
+<ul>
+  <li>외부 도메인 또는 타 벤더 RP와 SA 교환이 필요</li>
+  <li>MSDP 운영/보안 정책(TCP MD5, SA filter)을 이미 갖추고 있음</li>
+  <li>peer-RPF, mesh-group, timer 튜닝을 운영팀이 소화 가능</li>
+</ul>
+
+<h3>MSDP 필수 설계 체크리스트</h3>
+<ul>
+  <li>peer address는 반드시 unique Lo0</li>
+  <li><code>originator-id</code>는 Anycast가 아닌 unique Lo0</li>
+  <li>peer-RPF 경로 정합성(IGP next-hop과 peer 일치)</li>
+  <li>mesh-group은 내부 full mesh</li>
+  <li>SA filter/보안정책/타이머를 운영 표준으로 문서화</li>
+</ul>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 650" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>Anycast RP 방식 선택 의사결정 트리</title>
+<defs>
+  <marker id="arrow-d5-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#d29922"/>
+  </marker>
+  <marker id="arrow-d5-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+  </marker>
+  <marker id="arrow-d5-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#3fb950"/>
+  </marker>
+</defs>
+<style>
+  .d5-t{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Segoe UI','Noto Sans KR',sans-serif}
+</style>
+
+<!-- decision node 1 -->
+<rect x="90" y="30" width="340" height="70" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1.5"/>
+<text class="d5-t" x="260" y="60" text-anchor="middle" font-size="13" fill="#e6edf3">모든 RP가 NX-OS인가?</text>
+<text class="d5-t" x="260" y="80" text-anchor="middle" font-size="11" fill="#9198a1">(RFC 4610 상호운용 검증)</text>
+
+<!-- decision node 2 -->
+<rect x="90" y="190" width="340" height="70" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1.5"/>
+<text class="d5-t" x="260" y="230" text-anchor="middle" font-size="13" fill="#e6edf3">단일 PIM domain 내부인가?</text>
+
+<!-- decision node 3 -->
+<rect x="90" y="350" width="340" height="70" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1.5"/>
+<text class="d5-t" x="260" y="390" text-anchor="middle" font-size="13" fill="#e6edf3">inter-domain SA 교환이 필요한가?</text>
+
+<!-- vertical yes chain -->
+<line x1="260" y1="100" x2="260" y2="188" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow-d5-amber)"/>
+<rect x="235" y="135" width="50" height="20" rx="10" fill="#0b0f14" stroke="#30363d" stroke-width="1"/>
+<text class="d5-t" x="260" y="149" text-anchor="middle" font-size="11" fill="#9198a1">예</text>
+
+<line x1="260" y1="260" x2="260" y2="348" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow-d5-amber)"/>
+<rect x="235" y="295" width="50" height="20" rx="10" fill="#0b0f14" stroke="#30363d" stroke-width="1"/>
+<text class="d5-t" x="260" y="309" text-anchor="middle" font-size="11" fill="#9198a1">예</text>
+
+<line x1="260" y1="420" x2="260" y2="518" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arrow-d5-green)"/>
+<rect x="225" y="460" width="70" height="20" rx="10" fill="#0b0f14" stroke="#30363d" stroke-width="1"/>
+<text class="d5-t" x="260" y="474" text-anchor="middle" font-size="11" fill="#9198a1">아니오</text>
+
+<!-- MSDP terminal (right, shared) -->
+<rect x="560" y="220" width="170" height="100" rx="12" fill="#58a6ff" fill-opacity="0.12" stroke="#58a6ff" stroke-width="2"/>
+<text class="d5-t" x="645" y="260" text-anchor="middle" font-size="15" font-weight="700" fill="#58a6ff">MSDP</text>
+<text class="d5-t" x="645" y="280" text-anchor="middle" font-size="15" font-weight="700" fill="#58a6ff">Anycast-RP</text>
+<text class="d5-t" x="645" y="300" text-anchor="middle" font-size="10.5" fill="#9198a1">inter-domain / 멀티벤더</text>
+
+<!-- branch 1: 아니오 -> MSDP -->
+<path d="M 430,65 H 500 V 245 H 558" fill="none" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow-d5-blue)"/>
+<rect x="445" y="55" width="70" height="20" rx="10" fill="#0b0f14" stroke="#30363d" stroke-width="1"/>
+<text class="d5-t" x="480" y="69" text-anchor="middle" font-size="11" fill="#9198a1">아니오</text>
+
+<!-- branch 2: 아니오 -> MSDP -->
+<path d="M 430,225 H 520 V 270 H 558" fill="none" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow-d5-blue)"/>
+<rect x="445" y="215" width="70" height="20" rx="10" fill="#0b0f14" stroke="#30363d" stroke-width="1"/>
+<text class="d5-t" x="480" y="229" text-anchor="middle" font-size="11" fill="#9198a1">아니오</text>
+
+<!-- branch 3: 예 -> MSDP -->
+<path d="M 430,385 H 520 V 295 H 558" fill="none" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow-d5-blue)"/>
+<rect x="445" y="375" width="50" height="20" rx="10" fill="#0b0f14" stroke="#30363d" stroke-width="1"/>
+<text class="d5-t" x="470" y="389" text-anchor="middle" font-size="11" fill="#9198a1">예</text>
+
+<!-- PIM terminal (final, emphasized) -->
+<rect x="80" y="520" width="360" height="94" rx="14" fill="#3fb950" fill-opacity="0.12" stroke="#3fb950" stroke-width="2.5"/>
+<text class="d5-t" x="260" y="558" text-anchor="middle" font-size="17" font-weight="700" fill="#3fb950">PIM Anycast-RP</text>
+<rect x="200" y="572" width="120" height="24" rx="12" fill="#3fb950" fill-opacity="0.2" stroke="#3fb950" stroke-width="1"/>
+<text class="d5-t" x="260" y="589" text-anchor="middle" font-size="12" fill="#3fb950">기본 권장</text>
+</svg>
+<figcaption>Anycast RP 방식 선택 의사결정 트리</figcaption>
+</figure>
+
+<h2 id="self-check">14. 교육용 자가 점검 문제<a class="anchor" href="#self-check">#</a></h2>
+
+<div class="q">
+  <p><strong>Q1.</strong> Anycast RP 주소와 Loopback0을 같게 쓰면 MSDP에서 무슨 일이 일어나는가?</p>
+  <details>
+    <summary>정답 보기</summary>
+    <p>
+      <code>originator-id</code>와 peer-RPF 기준이 충돌해 SA가 discard될 수 있다.
+      현상은 session Established인데 SA cache가 비거나 accepted counter가 늘지 않는 형태로 나타난다.
+    </p>
+  </details>
+</div>
+
+<div class="q">
+  <p><strong>Q2.</strong> vPC non-forwarder의 (S,G) OIF가 0인 것은 장애인가?</p>
+  <details>
+    <summary>정답 보기</summary>
+    <p>
+      항상 장애는 아니다.
+      vPC forwarder election 결과로 non-forwarder는 state만 갖고 OIF가 0일 수 있다.
+      실제 장애 판정은 forwarder peer 전달 상태와 IGMP/vPC 상태를 함께 확인해야 한다.
+    </p>
+  </details>
+</div>
+
+<div class="q">
+  <p><strong>Q3.</strong> SA는 왜 source 주소가 아니라 originating RP 주소로 RPF 판정하는가?</p>
+  <details>
+    <summary>정답 보기</summary>
+    <p>
+      SA는 source data 자체가 아니라 “source 존재 광고”이기 때문이다.
+      광고의 신뢰 경로를 판단하려면 advertisement origin(RP-originator)을 기준으로 peer-RPF를 계산해야 루프/중복을 통제할 수 있다.
+    </p>
+  </details>
+</div>
+
+<div class="q">
+  <p><strong>Q4.</strong> <code>pre-build-spt</code>의 trade-off는?</p>
+  <details>
+    <summary>정답 보기</summary>
+    <p>
+      장점은 failover 수렴 단축,
+      단점은 평시 중복 경로 준비로 인한 upstream 오버헤드와 포워딩 리소스 사용 증가 가능성이다.
+      즉, 수렴 vs 자원 소비의 교환관계다.
+    </p>
+  </details>
+</div>
+
+<div class="q">
+  <p><strong>Q5.</strong> MSDP session이 Established인데 SA cache가 비어 있다면 무엇을 먼저 확인하는가?</p>
+  <details>
+    <summary>정답 보기</summary>
+    <p>
+      1) peer 주소가 unique loopback인지,
+      2) <code>originator-id</code>가 유니크인지,
+      3) peer-RPF mismatch counter가 증가하는지,
+      4) SA 정책 필터가 과도하지 않은지 순서로 점검한다.
+    </p>
+  </details>
+</div>
+
+<div class="q">
+  <p><strong>Q6.</strong> PIM Anycast-RP에서 복제 Register가 유실되면 source state는 영구히 없어지는가?</p>
+  <details>
+    <summary>정답 보기</summary>
+    <p>
+      아니다.
+      DR의 suppression timer 만료 후 Register 재전송으로 state가 재학습될 수 있다.
+      PIM Anycast-RP는 persistent DB 복제보다 Register 이벤트 재생성 모델에 가깝다.
+    </p>
+  </details>
+</div>
+
+<div class="q">
+  <p><strong>Q7.</strong> mesh-group이 full mesh가 아니면 왜 문제인가?</p>
+  <details>
+    <summary>정답 보기</summary>
+    <p>
+      mesh-group 규칙은 “같은 그룹 내 재전달 억제”이므로,
+      내부 연결이 완전하지 않으면 SA가 특정 노드에 도달하지 못하는 블라인드 스팟이 생긴다.
+    </p>
+  </details>
+</div>
+
+<div class="q">
+  <p><strong>Q8.</strong> RP가 vPC non-forwarder peer일 때 가능한 drop 시나리오는?</p>
+  <details>
+    <summary>정답 보기</summary>
+    <p>
+      source 트래픽/등록이 non-forwarder 쪽으로 들어와 registration owner가 그쪽으로 치우치면,
+      forwarding owner 쪽 (S,G) 준비가 지연되어 일부 흐름이 drop될 수 있다.
+      완화책으로 pre-build-spt 또는 external RP 분리가 사용된다.
+    </p>
+  </details>
+</div>
+
+<h2 id="final-summary">15. 요약 — 7가지 핵심 정리<a class="anchor" href="#final-summary">#</a></h2>
+
+<ol>
+  <li>Anycast RP는 RP 선택 문제를 IGP로 단순화하지만, source 동기화 방식(PIM Register vs MSDP SA) 선택이 핵심이다.</li>
+  <li>Nexus vPC 기준 기본 권장은 intra-domain에서 PIM Anycast-RP이며, 설정/운영 복잡도가 낮다.</li>
+  <li>MSDP는 inter-domain·멀티벤더 연동에 강하지만 peer-RPF, mesh-group, timer 관리 역량이 필요하다.</li>
+  <li>Anycast 주소(Lo1)와 unique 주소(Lo0) 분리는 두 방식 모두에서 필수 설계 원칙이다.</li>
+  <li>vPC에서는 state 동기화와 forwarding ownership이 분리될 수 있으며, non-forwarder OIF 0은 정상일 수 있다.</li>
+  <li><code>ip pim pre-build-spt</code>는 수렴 향상에 유효하지만 자원 사용 증가 trade-off를 동반한다.</li>
+  <li>정량 수렴 시간, keepalive-only 장애 시퀀스, 일부 내부 동작은 release/platform 의존이므로 운영 버전 문서와 실측 검증이 필수다.</li>
+</ol>
+
+<footer>
+  <p>출처:</p>
+  <ul>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc4610.html">RFC 4610</a></li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc3618.html">RFC 3618</a></li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc3446.html">RFC 3446</a></li>
+    <li><a href="https://www.rfc-editor.org/rfc/rfc4611.html">RFC 4611</a></li>
+    <li><a href="https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/106x/configuration/multicast/cisco-nexus-9000-series-nx-os-multicast-routing-configuration-guide-106x/m-configuring-pim-and-pimm6.html">Cisco Nexus 9000 NX-OS Multicast Routing Configuration Guide</a></li>
+    <li><a href="https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/106x/configuration/interfaces/cisco-nexus-9000-series-nx-os-interfaces-configuration-guide-release-106x/m_configuring_vpcs_9x.html">Cisco Nexus 9000 NX-OS Interfaces Configuration Guide (vPC)</a></li>
+    <li><a href="https://www.cisco.com/c/dam/en/us/td/docs/switches/datacenter/sw/design/vpc_design/vpc_best_practices_design_guide.pdf">Cisco Best Practices for vPC Design Guide</a></li>
+    <li><a href="https://www.cisco.com/c/en/us/support/docs/ip/ip-multicast/115011-anycast-pim.html">Cisco "Anycast RP using PIM" (Doc ID 115011)</a></li>
+    <li><a href="https://www.cisco.com/c/en/us/support/docs/ip/multicast-source-discovery-protocol-msdp/221962-configuring-anycast-rendevous-point-rp.html">Cisco "Configure Anycast RP Using MSDP for NX-OS" (Doc ID 221962)</a></li>
+    <li><a href="https://www.cisco.com/c/en/us/support/docs/ip/multicast/214140-multicast-forwarding-in-vpc-based-on-loc.html">Cisco "Multicast forwarding in vPC based on location of the source" (Doc ID 214140)</a></li>
+    <li><a href="https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/105x/configuration/vxlan/cisco-nexus-9000-series-nx-os-vxlan-configuration-guide-release-105x/configuring-trm.html">Cisco TRM in VXLAN BGP EVPN Fabrics</a></li>
+  </ul>
+  <p>
+    실제 적용 전 운영 중인 NX-OS 버전의 Release Notes 및 Configuration Guide를 반드시 확인하십시오.
+    일부 vPC 내부 동작은 platform/release 의존적입니다.
+  </p>
+</footer>
+
+<a class="totop" href="#top" title="맨 위로" aria-label="맨 위로">&#8593;</a>
+
+</div>
+</body>
+</html>
