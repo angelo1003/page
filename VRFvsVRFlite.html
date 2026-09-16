@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRF vs VRF Lite — 심층 분석</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@latest/dist/web/static/pretendard.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070a14; --bg2:#0c1020; --panel:rgba(255,255,255,.035); --panel-brd:rgba(255,255,255,.09);
+  --ink:#e8ebf5; --ink-dim:#9aa4c4; --ink-faint:#6b7396;
+  --lite1:#22d3ee; --lite2:#3b82f6; --vpn1:#a855f7; --vpn2:#ec4899;
+  --ok:#34d399; --no:#fb7185; --warn:#fbbf24;
+  --kw:#7dd3fc; --ip:#fca5a5; --num:#fcd34d; --cmt:#5b6488; --str:#86efac;
+  --shadow:0 18px 50px -12px rgba(0,0,0,.7);
+  --r:18px;
+}
+[data-theme="light"]{
+  --bg:#eef1f8; --bg2:#ffffff; --panel:rgba(20,30,60,.04); --panel-brd:rgba(20,30,60,.12);
+  --ink:#10162a; --ink-dim:#475073; --ink-faint:#8089a8;
+  --cmt:#8a93b2; --kw:#0369a1; --ip:#b91c1c; --num:#b45309; --str:#15803d;
+  --shadow:0 18px 40px -16px rgba(20,30,80,.25);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Pretendard',-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  line-height:1.75; -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+/* animated backdrop */
+.bg-orbs{position:fixed; inset:0; z-index:-2; overflow:hidden}
+.bg-orbs span{position:absolute; border-radius:50%; filter:blur(90px); opacity:.45; animation:float 22s ease-in-out infinite}
+.bg-orbs span:nth-child(1){width:520px;height:520px;background:radial-gradient(circle,#22d3ee,transparent 70%);top:-120px;left:-100px}
+.bg-orbs span:nth-child(2){width:560px;height:560px;background:radial-gradient(circle,#a855f7,transparent 70%);top:30%;right:-160px;animation-delay:-7s}
+.bg-orbs span:nth-child(3){width:480px;height:480px;background:radial-gradient(circle,#ec4899,transparent 70%);bottom:-140px;left:30%;animation-delay:-14s}
+[data-theme="light"] .bg-orbs span{opacity:.22}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.08)}66%{transform:translate(-30px,25px) scale(.95)}}
+.bg-grid{position:fixed; inset:0; z-index:-1; background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px); background-size:46px 46px; mask-image:radial-gradient(ellipse at 50% 0%,#000 30%,transparent 80%)}
+[data-theme="light"] .bg-grid{background-image:linear-gradient(rgba(20,30,80,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(20,30,80,.05) 1px,transparent 1px)}
+
+/* progress + toolbar */
+#progress{position:fixed; top:0; left:0; height:3px; width:0%; z-index:100;
+  background:linear-gradient(90deg,var(--lite1),var(--vpn1),var(--vpn2)); box-shadow:0 0 14px rgba(168,85,247,.7)}
+.toolbar{position:fixed; top:16px; right:20px; z-index:100; display:flex; gap:8px}
+.tbtn{width:42px;height:42px;border-radius:12px;border:1px solid var(--panel-brd);background:var(--panel);
+  backdrop-filter:blur(12px); color:var(--ink); cursor:pointer; font-size:18px; display:grid; place-items:center; transition:.25s}
+.tbtn:hover{transform:translateY(-2px); border-color:var(--lite1); color:var(--lite1)}
+
+/* layout */
+.wrap{max-width:1180px; margin:0 auto; padding:0 22px; display:grid; grid-template-columns:260px 1fr; gap:42px}
+@media(max-width:980px){.wrap{grid-template-columns:1fr} .toc{display:none}}
+
+/* TOC */
+.toc{position:sticky; top:24px; align-self:start; max-height:calc(100vh - 48px); overflow-y:auto; padding:6px 4px 30px}
+.toc::-webkit-scrollbar{width:6px}.toc::-webkit-scrollbar-thumb{background:var(--panel-brd);border-radius:6px}
+.toc h4{font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-faint); margin:18px 10px 12px}
+.toc a{display:flex; gap:10px; align-items:center; padding:8px 12px; border-radius:10px; color:var(--ink-dim);
+  text-decoration:none; font-size:.9rem; font-weight:500; transition:.2s; border-left:2px solid transparent}
+.toc a .n{font-family:'JetBrains Mono',monospace; font-size:.74rem; color:var(--ink-faint); min-width:18px}
+.toc a:hover{background:var(--panel); color:var(--ink)}
+.toc a.active{background:linear-gradient(90deg,rgba(34,211,238,.14),transparent); color:#fff; border-left-color:var(--lite1)}
+.toc a.active .n{color:var(--lite1)}
+[data-theme="light"] .toc a.active{color:#0b1020}
+
+/* hero */
+.hero{position:relative; text-align:center; padding:90px 0 60px}
+.eyebrow{display:inline-flex; align-items:center; gap:9px; padding:8px 16px; border-radius:999px;
+  border:1px solid var(--panel-brd); background:var(--panel); backdrop-filter:blur(10px);
+  font-size:.78rem; font-weight:600; letter-spacing:.05em; color:var(--ink-dim); margin-bottom:26px}
+.eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--lite1);box-shadow:0 0 10px var(--lite1);animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.hero h1{font-size:clamp(2.3rem,6vw,4.2rem); line-height:1.08; margin:0 0 18px; font-weight:800; letter-spacing:-.02em}
+.hero h1 .g1{background:linear-gradient(120deg,var(--lite1),var(--lite2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+.hero h1 .vs{font-size:.5em; vertical-align:middle; color:var(--ink-faint); margin:0 .25em; font-weight:600}
+.hero h1 .g2{background:linear-gradient(120deg,var(--vpn1),var(--vpn2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+.hero p.sub{max-width:720px; margin:0 auto 34px; color:var(--ink-dim); font-size:clamp(1rem,2.2vw,1.18rem)}
+.hero-tags{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:14px}
+.htag{padding:9px 18px; border-radius:12px; font-weight:700; font-size:.9rem; border:1px solid var(--panel-brd)}
+.htag.l{background:linear-gradient(135deg,rgba(34,211,238,.18),rgba(59,130,246,.12)); color:var(--lite1); border-color:rgba(34,211,238,.35)}
+.htag.v{background:linear-gradient(135deg,rgba(168,85,247,.18),rgba(236,72,153,.12)); color:var(--vpn1); border-color:rgba(168,85,247,.35)}
+.scroll-cue{margin-top:46px;color:var(--ink-faint);font-size:.8rem;letter-spacing:.2em}
+.scroll-cue .arrow{display:block;margin:10px auto 0;width:22px;height:22px;border-right:2px solid var(--ink-faint);border-bottom:2px solid var(--ink-faint);transform:rotate(45deg);animation:bob 1.8s infinite}
+@keyframes bob{50%{transform:rotate(45deg) translate(6px,6px)}}
+
+/* sections */
+section{padding:46px 0; scroll-margin-top:30px}
+.sec-head{display:flex; align-items:center; gap:16px; margin-bottom:26px}
+.sec-num{font-family:'JetBrains Mono',monospace; font-size:1rem; font-weight:700; color:#fff;
+  width:46px; height:46px; border-radius:14px; display:grid; place-items:center; flex-shrink:0;
+  background:linear-gradient(135deg,var(--lite2),var(--vpn1)); box-shadow:0 8px 22px -6px rgba(124,58,237,.6)}
+.sec-head h2{font-size:clamp(1.5rem,3.4vw,2.1rem); margin:0; font-weight:800; letter-spacing:-.01em}
+h3{font-size:1.18rem; font-weight:700; margin:34px 0 14px; color:var(--ink)}
+h3 .pre{font-family:'JetBrains Mono',monospace; color:var(--lite1); font-size:.85em; margin-right:8px}
+p{margin:14px 0; color:var(--ink-dim)}
+strong{color:var(--ink); font-weight:700}
+code.inl{font-family:'JetBrains Mono',monospace; font-size:.86em; background:var(--panel); border:1px solid var(--panel-brd);
+  padding:2px 7px; border-radius:6px; color:var(--lite1)}
+[data-theme="light"] code.inl{color:#0369a1}
+a.lnk{color:var(--lite1); text-decoration:none; border-bottom:1px dashed rgba(34,211,238,.4)}
+
+/* reveal */
+.reveal{opacity:0; transform:translateY(26px); transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1; transform:none}
+
+/* cards / panels */
+.card{background:var(--panel); border:1px solid var(--panel-brd); border-radius:var(--r); padding:22px 24px; backdrop-filter:blur(8px); box-shadow:var(--shadow)}
+.grid{display:grid; gap:16px}
+.g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.mini{border-radius:14px; padding:18px 20px; background:var(--panel); border:1px solid var(--panel-brd); transition:.3s}
+.mini:hover{transform:translateY(-4px); border-color:var(--lite1); box-shadow:0 16px 36px -14px rgba(34,211,238,.4)}
+.mini .ic{font-size:1.5rem; margin-bottom:8px}
+.mini h5{margin:0 0 6px; font-size:1rem; font-weight:700}
+.mini p{margin:0; font-size:.88rem; color:var(--ink-dim)}
+
+/* callouts */
+.callout{border-radius:14px; padding:16px 20px 16px 22px; margin:18px 0; position:relative; border:1px solid var(--panel-brd); background:var(--panel); overflow:hidden}
+.callout::before{content:''; position:absolute; left:0; top:0; bottom:0; width:4px}
+.callout.info::before{background:var(--lite1)} .callout.warn::before{background:var(--warn)} .callout.key::before{background:linear-gradient(var(--vpn1),var(--vpn2))}
+.callout .tag{display:inline-block; font-weight:700; font-size:.78rem; letter-spacing:.04em; margin-bottom:4px}
+.callout.info .tag{color:var(--lite1)} .callout.warn .tag{color:var(--warn)} .callout.key .tag{color:var(--vpn1)}
+.callout p{margin:4px 0 0; color:var(--ink)}
+
+/* the big VS compare cards */
+.versus{display:grid; grid-template-columns:1fr auto 1fr; gap:18px; align-items:stretch; margin:8px 0}
+@media(max-width:760px){.versus{grid-template-columns:1fr} .versus .vsbadge{margin:-6px auto}}
+.vcard{border-radius:18px; padding:24px; border:1px solid var(--panel-brd); position:relative; overflow:hidden}
+.vcard.lite{background:linear-gradient(160deg,rgba(34,211,238,.10),rgba(59,130,246,.04))}
+.vcard.vpn{background:linear-gradient(160deg,rgba(168,85,247,.10),rgba(236,72,153,.04))}
+.vcard h4{margin:0 0 4px; font-size:1.25rem; font-weight:800}
+.vcard.lite h4{color:var(--lite1)} .vcard.vpn h4{color:var(--vpn1)}
+.vcard .role{font-size:.8rem; color:var(--ink-faint); margin-bottom:14px; font-family:'JetBrains Mono',monospace}
+.vcard ul{margin:0; padding:0; list-style:none}
+.vcard li{padding:8px 0 8px 26px; position:relative; font-size:.92rem; color:var(--ink-dim); border-top:1px dashed var(--panel-brd)}
+.vcard li:first-child{border-top:none}
+.vcard li::before{content:''; position:absolute; left:4px; top:15px; width:8px; height:8px; border-radius:50%}
+.vcard.lite li::before{background:var(--lite1)} .vcard.vpn li::before{background:var(--vpn1)}
+.vsbadge{align-self:center; font-family:'JetBrains Mono',monospace; font-weight:800; font-size:1.1rem; color:#fff;
+  width:54px; height:54px; border-radius:50%; display:grid; place-items:center; background:var(--bg2); border:2px solid var(--panel-brd); box-shadow:var(--shadow)}
+
+/* tables */
+.tw{overflow-x:auto; margin:18px 0; border-radius:14px; border:1px solid var(--panel-brd)}
+table{width:100%; border-collapse:collapse; font-size:.9rem; min-width:480px}
+th,td{padding:13px 16px; text-align:left; border-bottom:1px solid var(--panel-brd); vertical-align:top}
+thead th{background:var(--panel); font-weight:700; color:var(--ink); position:sticky; top:0; font-size:.86rem; letter-spacing:.02em}
+tbody tr{transition:background .2s}
+tbody tr:hover{background:var(--panel)}
+tbody tr:last-child td{border-bottom:none}
+td:first-child{color:var(--ink); font-weight:600}
+.yes{color:var(--ok); font-weight:700} .non{color:var(--no); font-weight:700}
+th.lite,td.lite{box-shadow:inset 3px 0 var(--lite1)} 
+table strong{color:var(--ink)}
+
+/* code */
+.codewrap{margin:18px 0; border-radius:14px; overflow:hidden; border:1px solid var(--panel-brd); background:#070a16; box-shadow:var(--shadow)}
+[data-theme="light"] .codewrap{background:#0c1226}
+.codebar{display:flex; align-items:center; gap:8px; padding:11px 16px; background:rgba(255,255,255,.03); border-bottom:1px solid var(--panel-brd)}
+.codebar .dots{display:flex; gap:6px}
+.codebar .dots i{width:11px;height:11px;border-radius:50%}
+.codebar .dots i:nth-child(1){background:#ff5f57}.codebar .dots i:nth-child(2){background:#febc2e}.codebar .dots i:nth-child(3){background:#28c840}
+.codebar .ttl{font-family:'JetBrains Mono',monospace; font-size:.78rem; color:var(--ink-faint); margin-left:6px}
+.codebar .lang{margin-left:auto; font-size:.7rem; font-weight:700; letter-spacing:.1em; color:var(--lite1); text-transform:uppercase}
+pre{margin:0; padding:18px 20px; overflow-x:auto; font-family:'JetBrains Mono',monospace; font-size:.82rem; line-height:1.7; color:#cdd6f4}
+[data-theme="light"] pre{color:#cdd6f4}
+pre code{font-family:inherit}
+.t-kw{color:var(--kw); font-weight:600} .t-ip{color:var(--ip)} .t-num{color:var(--num)} .t-cmt{color:var(--cmt); font-style:italic} 
+
+/* diagrams */
+.diagram{background:var(--panel); border:1px solid var(--panel-brd); border-radius:18px; padding:30px 22px; margin:20px 0; box-shadow:var(--shadow)}
+.diagram .dt{font-size:.78rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:22px; font-weight:700; text-align:center}
+.topo{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:0}
+.node{display:flex; flex-direction:column; align-items:center; gap:8px; min-width:74px}
+.node .box{width:60px; height:60px; border-radius:14px; display:grid; place-items:center; font-weight:800; font-family:'JetBrains Mono',monospace; font-size:.86rem; border:1px solid var(--panel-brd); background:var(--bg2); position:relative}
+.node.ce .box{color:var(--ink-dim)}
+.node.pe .box{color:var(--vpn1); border-color:rgba(168,85,247,.5); background:linear-gradient(160deg,rgba(168,85,247,.16),transparent); box-shadow:0 0 22px -6px rgba(168,85,247,.5)}
+.node.p .box{color:var(--ink-faint)}
+.node.r .box{color:var(--lite1); border-color:rgba(34,211,238,.45); background:linear-gradient(160deg,rgba(34,211,238,.14),transparent)}
+.node .lab{font-size:.7rem; color:var(--ink-faint); text-align:center; line-height:1.3}
+.node .vrfbadge{font-size:.6rem; font-weight:700; padding:2px 7px; border-radius:6px; background:rgba(168,85,247,.18); color:var(--vpn1)}
+.link{flex:1; min-width:30px; height:2px; position:relative; margin:0 2px; align-self:flex-start; margin-top:30px}
+.link.lite{height:18px; display:flex; flex-direction:column; justify-content:center; gap:3px; min-width:42px}
+.link.lite i{height:3px; border-radius:3px; display:block}
+.link.lite i:nth-child(1){background:var(--no)} .link.lite i:nth-child(2){background:var(--lite1)} .link.lite i:nth-child(3){background:var(--ok)}
+.link.mpls{background:repeating-linear-gradient(90deg,var(--vpn1) 0 8px,transparent 8px 14px); height:3px; margin-top:30px}
+.link .lk-lab{position:absolute; top:14px; left:50%; transform:translateX(-50%); font-size:.6rem; color:var(--ink-faint); white-space:nowrap; font-family:'JetBrains Mono',monospace}
+.mpbgp-arc{text-align:center; margin-top:18px; font-size:.72rem; color:var(--vpn1); font-family:'JetBrains Mono',monospace; border-top:1px dashed rgba(168,85,247,.4); padding-top:10px}
+.legend{display:flex; gap:18px; justify-content:center; flex-wrap:wrap; margin-top:20px; font-size:.74rem; color:var(--ink-dim)}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+.legend i{width:14px;height:5px;border-radius:3px; display:inline-block}
+
+/* label stack */
+.stack{display:flex; align-items:stretch; justify-content:center; gap:10px; flex-wrap:wrap; margin:6px 0}
+.lblbox{border-radius:12px; padding:16px 22px; text-align:center; min-width:150px; border:1px solid var(--panel-brd); font-family:'JetBrains Mono',monospace}
+.lblbox.t{background:linear-gradient(160deg,rgba(251,191,36,.16),transparent); border-color:rgba(251,191,36,.4)}
+.lblbox.v{background:linear-gradient(160deg,rgba(168,85,247,.16),transparent); border-color:rgba(168,85,247,.4)}
+.lblbox.d{background:var(--bg2)}
+.lblbox b{display:block; font-size:.92rem; margin-bottom:4px; color:var(--ink)}
+.lblbox small{font-size:.7rem; color:var(--ink-faint)}
+.stackplus{align-self:center; font-size:1.3rem; color:var(--ink-faint)}
+
+/* checklist */
+.check li{list-style:none}
+.checklist{display:grid; gap:10px; padding:0; margin:8px 0}
+.checklist label{display:flex; gap:14px; align-items:flex-start; padding:14px 18px; border-radius:12px; border:1px solid var(--panel-brd); background:var(--panel); cursor:pointer; transition:.25s; color:var(--ink-dim)}
+.checklist label:hover{border-color:var(--lite1)}
+.checklist input{appearance:none; width:22px; height:22px; border-radius:7px; border:2px solid var(--ink-faint); flex-shrink:0; margin-top:2px; cursor:pointer; transition:.2s; position:relative}
+.checklist input:checked{background:linear-gradient(135deg,var(--lite1),var(--vpn1)); border-color:transparent}
+.checklist input:checked::after{content:'✓'; position:absolute; inset:0; display:grid; place-items:center; color:#fff; font-size:.8rem; font-weight:800}
+.checklist label:has(input:checked){color:var(--ink-faint); text-decoration:line-through; text-decoration-color:var(--ink-faint)}
+
+/* refs */
+.refs{display:grid; gap:10px}
+.ref{display:flex; gap:14px; align-items:center; padding:13px 18px; border-radius:12px; background:var(--panel); border:1px solid var(--panel-brd); font-size:.9rem}
+.ref .badge{font-family:'JetBrains Mono',monospace; font-size:.7rem; font-weight:700; padding:4px 9px; border-radius:7px; background:rgba(34,211,238,.14); color:var(--lite1); white-space:nowrap}
+
+/* footer */
+footer{text-align:center; padding:60px 20px 50px; color:var(--ink-faint); font-size:.85rem; border-top:1px solid var(--panel-brd); margin-top:40px}
+footer .big{font-size:1.05rem; color:var(--ink-dim); margin-bottom:8px; font-weight:600}
+
+/* back to top */
+#top{position:fixed; bottom:26px; right:26px; width:48px; height:48px; border-radius:14px; border:1px solid var(--panel-brd);
+  background:var(--panel); backdrop-filter:blur(12px); color:var(--ink); cursor:pointer; font-size:18px; opacity:0; pointer-events:none;
+  transition:.3s; z-index:90; display:grid; place-items:center}
+#top.show{opacity:1; pointer-events:auto}
+#top:hover{background:linear-gradient(135deg,var(--lite2),var(--vpn1)); color:#fff; transform:translateY(-3px)}
+.dim{color:var(--ink-faint); font-size:.8rem}
+</style>
+</head>
+<body>
+<div class="bg-orbs"><span></span><span></span><span></span></div>
+<div class="bg-grid"></div>
+<div id="progress"></div>
+<div class="toolbar">
+  <button class="tbtn" id="themeBtn" title="테마 전환">🌙</button>
+</div>
+<button id="top" title="맨 위로">↑</button>
+
+<div class="wrap">
+  <!-- ============ TOC ============ -->
+  <nav class="toc" id="toc">
+    <h4>목차 · Contents</h4>
+    <a href="#s1"><span class="n">01</span> 핵심 요약</a>
+    <a href="#s2"><span class="n">02</span> VRF란 무엇인가</a>
+    <a href="#s3"><span class="n">03</span> 구성 요소 RD·RT</a>
+    <a href="#s4"><span class="n">04</span> VRF Lite 심층</a>
+    <a href="#s5"><span class="n">05</span> MPLS L3VPN 심층</a>
+    <a href="#s6"><span class="n">06</span> 플레인 비교</a>
+    <a href="#s7"><span class="n">07</span> 종합 비교표</a>
+    <a href="#s8"><span class="n">08</span> 설정 예시</a>
+    <a href="#s9"><span class="n">09</span> 라우트 누수</a>
+    <a href="#s10"><span class="n">10</span> 아키텍트 관점</a>
+    <a href="#s11"><span class="n">11</span> 확장성·운영</a>
+    <a href="#s12"><span class="n">12</span> 현대적 대안</a>
+    <a href="#s13"><span class="n">13</span> 설계 체크리스트</a>
+    <a href="#s14"><span class="n">14</span> 용어 정리</a>
+  </nav>
+
+  <!-- ============ MAIN ============ -->
+  <main>
+    <!-- HERO -->
+    <header class="hero">
+      <div class="eyebrow"><span class="dot"></span> 네트워크 엔지니어 &amp; 아키텍트 관점 심층 분석</div>
+      <h1><span class="g1">VRF Lite</span><span class="vs">vs</span><span class="g2">MPLS&nbsp;L3VPN</span></h1>
+      <p class="sub">하나의 장비를 여러 가상 라우터로 나누는 <strong>VRF</strong>. 그것을 장비 간에 확장하는 두 가지 길 —
+        컨트롤 플레인·데이터 플레인부터 설계 의사결정까지 한눈에.</p>
+      <div class="hero-tags">
+        <span class="htag l">◆ VRF Lite · Multi-VRF CE</span>
+        <span class="htag v">◆ MPLS L3VPN · RFC 4364</span>
+      </div>
+      <div class="scroll-cue">SCROLL<span class="arrow"></span></div>
+    </header>
+
+    <!-- 1. TL;DR -->
+    <section id="s1" class="reveal">
+      <div class="sec-head"><div class="sec-num">01</div><h2>핵심 요약 — TL;DR</h2></div>
+      <p><strong>VRF(Virtual Routing and Forwarding)</strong> 는 하나의 물리 라우터/스위치 안에 <strong>여러 개의 독립된 라우팅 테이블(RIB/FIB)</strong> 을 만들어 L3 트래픽을 논리적으로 분리하는 기술이다. 서로 다른 VRF는 <strong>IP 주소가 중복(overlap)되어도 충돌하지 않는다.</strong></p>
+
+      <div class="versus">
+        <div class="vcard lite">
+          <h4>VRF Lite</h4>
+          <div class="role">// Multi-VRF CE</div>
+          <ul>
+            <li><strong>MPLS 없이</strong> VRF만으로 분리</li>
+            <li>구간마다 VRF별 분리 링크(802.1Q)</li>
+            <li>VRF별 라우팅 인스턴스를 hop-by-hop 구성</li>
+            <li><strong>모든 중간 장비가 모든 VRF를 인지</strong></li>
+          </ul>
+        </div>
+        <div class="vsbadge">VS</div>
+        <div class="vcard vpn">
+          <h4>MPLS L3VPN</h4>
+          <div class="role">// Full VRF</div>
+          <ul>
+            <li>VRF + <strong>MP-BGP(VPNv4)</strong> + MPLS</li>
+            <li>PE(엣지)만 VRF를 인지</li>
+            <li>P(코어)는 <strong>레이블만 스위칭</strong></li>
+            <li>대규모 멀티테넌시에 최적</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout key">
+        <span class="tag">한 줄 정리</span>
+        <p><strong>"VRF Lite는 코어 전체에 VRF를 흩뿌리는 방식, MPLS L3VPN은 코어를 레이블로 추상화하고 엣지에만 VRF를 두는 방식"</strong> 이다.</p>
+      </div>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>관점</th><th class="lite">VRF Lite</th><th>MPLS L3VPN</th></tr></thead>
+          <tbody>
+            <tr><td>데이터 플레인</td><td class="lite">네이티브 IP + 802.1Q</td><td>MPLS 레이블 스택</td></tr>
+            <tr><td>코어 장비의 VRF 인지</td><td class="lite"><strong>모든 hop이 인지</strong></td><td><strong>PE만 인지 (P는 모름)</strong></td></tr>
+            <tr><td>확장성</td><td class="lite">낮음 (수 개~수십 개 VRF)</td><td>높음 (수천 VRF)</td></tr>
+            <tr><td>적합 영역</td><td class="lite">캠퍼스, DC, 소규모 분리</td><td>통신사 백본, 대규모 WAN</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 2. VRF란 -->
+    <section id="s2" class="reveal">
+      <div class="sec-head"><div class="sec-num">02</div><h2>VRF란 무엇인가</h2></div>
+      <h3><span class="pre">2.1</span> 정의</h3>
+      <p>기본 라우터는 <strong>단 하나의 글로벌 라우팅 테이블</strong>을 가진다. VRF는 이 라우팅/포워딩 테이블을 <strong>여러 개의 독립 인스턴스로 가상화</strong>한다. 서버 가상화가 하나의 물리 서버를 여러 VM으로 나누듯, VRF는 하나의 L3 장비를 여러 개의 "가상 라우터"로 나눈다.</p>
+      <p>각 VRF 인스턴스는 다음을 <strong>독립적으로</strong> 소유한다.</p>
+      <div class="grid g4">
+        <div class="mini"><div class="ic">🗂️</div><h5>RIB</h5><p>별도 라우팅 테이블 (Routing Information Base)</p></div>
+        <div class="mini"><div class="ic">⚡</div><h5>FIB / CEF</h5><p>별도 하드웨어 포워딩 테이블</p></div>
+        <div class="mini"><div class="ic">🔀</div><h5>라우팅 인스턴스</h5><p>OSPF process, BGP address-family 등 독립 인접성</p></div>
+        <div class="mini"><div class="ic">🔌</div><h5>인터페이스 소속</h5><p>인터페이스/서브인터페이스의 VRF 바인딩</p></div>
+      </div>
+
+      <h3><span class="pre">2.2</span> 왜 VRF를 쓰는가 — 대표 Use Case</h3>
+      <div class="grid g3">
+        <div class="mini"><div class="ic">🏢</div><h5>멀티테넌시 / 망 분리</h5><p>여러 고객·사업부 트래픽을 하나의 인프라에서 격리</p></div>
+        <div class="mini"><div class="ic">🔒</div><h5>보안 세그멘테이션</h5><p>PCI 결제망, 게스트, IoT/OT, 관리망(OOB) 완전 분리</p></div>
+        <div class="mini"><div class="ic">🔁</div><h5>중복 IP 수용</h5><p>M&amp;A 후 동일 사설 대역을 NAT 없이 동시 수용</p></div>
+        <div class="mini"><div class="ic">🛠️</div><h5>관리 플레인 분리</h5><p><code class="inl">Mgmt-vrf</code> 로 관리 트래픽 분리 (NX-OS/IOS-XR 기본)</p></div>
+        <div class="mini"><div class="ic">🌐</div><h5>MPLS VPN 서비스</h5><p>통신사의 고객별 사설망 L3VPN 상품 제공</p></div>
+        <div class="mini"><div class="ic">🤝</div><h5>Shared Service / Extranet</h5><p>공통 서비스(DNS·인증·인터넷 GW) 공유</p></div>
+      </div>
+
+      <h3><span class="pre">2.3</span> 핵심 특성: 주소 중복 허용</h3>
+      <div class="diagram">
+        <div class="dt">동일 대역, 완전히 별개의 VRF</div>
+        <div class="topo" style="gap:24px">
+          <div class="node r"><div class="box">RED</div><div class="lab">VRF RED<br>10.1.1.0/24</div></div>
+          <div class="node" style="min-width:120px"><div class="box" style="border:none;background:transparent;color:var(--ink-faint);font-size:.8rem">Server A</div></div>
+          <div class="node p"><div class="box" style="border-color:rgba(34,211,238,.45);color:var(--lite1)">≠</div><div class="lab">충돌 없음</div></div>
+          <div class="node" style="min-width:120px"><div class="box" style="border:none;background:transparent;color:var(--ink-faint);font-size:.8rem">Server B</div></div>
+          <div class="node" style="min-width:74px"><div class="box" style="color:var(--vpn1);border-color:rgba(168,85,247,.5);background:linear-gradient(160deg,rgba(168,85,247,.16),transparent)">BLUE</div><div class="lab">VRF BLUE<br>10.1.1.0/24</div></div>
+        </div>
+      </div>
+      <p>두 VRF는 서로의 라우트를 보지 못하므로 IP가 겹쳐도 무방하다. 이것이 VRF가 <strong>NAT 없이 중복 주소를 수용</strong>할 수 있는 근본 이유다.</p>
+    </section>
+
+    <!-- 3. RD/RT -->
+    <section id="s3" class="reveal">
+      <div class="sec-head"><div class="sec-num">03</div><h2>VRF의 구성 요소 : RD · RT · RIB · FIB</h2></div>
+      <p>VRF Lite와 L3VPN의 차이를 이해하려면 이 네 가지 개념을 명확히 구분해야 한다. 특히 <strong>RD/RT는 MPLS L3VPN에서만 의미가 본격적으로 발현</strong>된다.</p>
+
+      <h3><span class="pre">3.1</span> RIB / FIB</h3>
+      <div class="grid g2">
+        <div class="card"><strong>RIB</strong> — VRF별 라우팅 테이블<br><code class="inl">show ip route vrf RED</code></div>
+        <div class="card"><strong>FIB(CEF)</strong> — VRF별 하드웨어 포워딩 테이블<br><code class="inl">show ip cef vrf RED</code></div>
+      </div>
+      <div class="callout info"><span class="tag">VRF의 본질</span><p>VRF Lite든 L3VPN이든 <strong>RIB·FIB는 항상 VRF별로 존재</strong>한다.</p></div>
+
+      <div class="versus" style="margin-top:26px">
+        <div class="vcard lite">
+          <h4>RD</h4>
+          <div class="role">// Route Distinguisher — "주소를 유일하게"</div>
+          <ul>
+            <li><strong>8바이트(64bit)</strong> 를 IPv4(32bit) 앞에 붙여 <strong>VPNv4(96bit)</strong> 생성</li>
+            <li>중복 IP를 <strong>전역적으로 유일</strong>하게 구분</li>
+            <li>형식: <code class="inl">ASN:nn</code> 또는 <code class="inl">IP:nn</code></li>
+            <li>⚠️ 단지 유일성만 부여 — 정책 결정은 못 함</li>
+          </ul>
+        </div>
+        <div class="vsbadge" style="font-size:.8rem">RD<br>RT</div>
+        <div class="vcard vpn">
+          <h4>RT</h4>
+          <div class="role">// Route Target — "어디로 import/export"</div>
+          <ul>
+            <li>BGP <strong>Extended Community</strong> 태그</li>
+            <li><strong>Export RT</strong>: 광고 시 붙이는 태그</li>
+            <li><strong>Import RT</strong>: 해당 태그 라우트를 가져옴</li>
+            <li>Full-mesh · Hub-Spoke · Extranet 토폴로지 표현</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="codewrap">
+        <div class="codebar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">prefix-transform</span><span class="lang">concept</span></div>
+        <pre><code class="lang-plain">원본:    10.1.1.0/24
+VPNv4:   65000:1:10.1.1.0/24   ← RD가 붙어 유일해짐
+
+VRF CUST_A:  export RT 65000:100,  import RT 65000:100
+VRF SHARED:  export RT 65000:999,  import RT 65000:100  ← CUST_A 라우트를 가져옴</code></pre>
+      </div>
+
+      <h3><span class="pre">3.4</span> RD vs RT 한 줄 비교</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th></th><th class="lite">RD</th><th>RT</th></tr></thead>
+          <tbody>
+            <tr><td>역할</td><td class="lite">주소를 <strong>유일하게</strong></td><td>라우트를 <strong>어디로 import/export</strong></td></tr>
+            <tr><td>개수</td><td class="lite">VRF당 보통 1개</td><td>VRF당 여러 개 가능</td></tr>
+            <tr><td>본질</td><td class="lite">프리픽스의 일부(96bit화)</td><td>BGP Extended Community</td></tr>
+            <tr><td>정책 표현</td><td class="lite"><span class="non">불가</span></td><td><span class="yes">가능 (토폴로지 제어)</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4. VRF Lite -->
+    <section id="s4" class="reveal">
+      <div class="sec-head"><div class="sec-num">04</div><h2>VRF Lite 심층 분석</h2></div>
+      <p><strong>VRF Lite = MPLS와 MP-BGP 백본 없이 VRF만으로 L3 분리를 장비 간에 확장하는 방식.</strong> 공식 명칭은 <strong>Multi-VRF CE</strong> 또는 <strong>VRF-Lite</strong>.</p>
+      <div class="callout info"><span class="tag">핵심 동작</span><p>"각 장비에 동일한 VRF들을 정의하고, 장비를 잇는 모든 구간을 <strong>VRF 개수만큼 논리적으로 쪼개서</strong> 각 VRF 전용 링크로 연결한다. 그리고 VRF별로 라우팅 프로토콜을 따로 돌린다."</p></div>
+
+      <div class="diagram">
+        <div class="dt">VRF Lite — VRF가 코어 전체에 퍼진다</div>
+        <div class="topo">
+          <div class="node ce"><div class="box">CE</div></div>
+          <div class="link lite"><i></i><i></i><i></i></div>
+          <div class="node r"><div class="box">R1</div></div>
+          <div class="link lite"><i></i><i></i><i></i></div>
+          <div class="node r"><div class="box">R2</div></div>
+          <div class="link lite"><i></i><i></i><i></i></div>
+          <div class="node r"><div class="box">R3</div></div>
+          <div class="link lite"><i></i><i></i><i></i></div>
+          <div class="node r"><div class="box">R4</div></div>
+          <div class="link lite"><i></i><i></i><i></i></div>
+          <div class="node ce"><div class="box">CE</div></div>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--no)"></i> VRF RED</span>
+          <span><i style="background:var(--lite1)"></i> VRF BLUE</span>
+          <span><i style="background:var(--ok)"></i> VRF GREEN</span>
+          <span style="color:var(--ink-faint)">→ 각 구간마다 VRF별 서브IF + VRF별 라우팅 (모든 장비가 모든 VRF 인지)</span>
+        </div>
+      </div>
+
+      <h3><span class="pre">4.2</span> 데이터 플레인</h3>
+      <p><strong>네이티브 IP 포워딩</strong>. MPLS 레이블 없음. 장비 간 구간에서 VRF를 구분하는 수단은 <strong>802.1Q 서브인터페이스</strong>(VRF마다 VLAN 태그 할당) 또는 VRF별 물리 인터페이스다. "와이어 위"에서는 VLAN 태그가 VRF를 구분하며, 패킷 자체에는 VRF 정보가 없고 <strong>인터페이스의 VRF 소속</strong>으로 결정된다.</p>
+
+      <h3><span class="pre">4.3</span> 컨트롤 플레인</h3>
+      <p>VRF마다 <strong>별도의 라우팅 인스턴스</strong>를 운용한다 — OSPF는 VRF별 process, EIGRP/BGP는 <code class="inl">address-family ipv4 vrf</code>, Static은 <code class="inl">ip route vrf</code>. <strong>MP-BGP VPNv4 / MPLS 레이블 배포는 없다.</strong></p>
+
+      <div class="grid g2" style="margin-top:24px">
+        <div class="card" style="border-color:rgba(52,211,153,.3)">
+          <h4 style="margin:0 0 10px;color:var(--ok)">▲ 장점</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--ink-dim);font-size:.92rem;line-height:2">
+            <li><strong>단순한 개념</strong> — IGP만 알면 구성 가능</li>
+            <li><strong>광범위한 장비 지원</strong> — L3 스위치·방화벽 등</li>
+            <li><strong>소규모 빠른 구축</strong> — VLAN+VRF+IGP</li>
+            <li>패킷이 IP라 <strong>디버깅 직관적</strong></li>
+          </ul>
+        </div>
+        <div class="card" style="border-color:rgba(251,113,133,.3)">
+          <h4 style="margin:0 0 10px;color:var(--no)">▼ 단점 ★아키텍트 필독</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--ink-dim);font-size:.92rem;line-height:2">
+            <li><strong>확장성 폭발</strong> — 구간마다 N개 서브IF</li>
+            <li><strong>경로상 모든 장비</strong>가 모든 VRF 유지</li>
+            <li>VRF 추가 시 전 구간 손봐야 함 (휴먼 에러)</li>
+            <li><strong>No 트래픽 엔지니어링</strong> (MPLS-TE/FRR 부재)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3><span class="pre">4.6</span> VRF Lite가 적합한 곳</h3>
+      <p class="dim">캠퍼스/엔터프라이즈 망 분리(게스트·IoT·직원·OT, VRF 한 자릿수~십 단위) · 소규모 DC 멀티테넌시 · 방화벽 전후단/인터넷 에지 분리 · MPLS 역량/장비가 없는 환경 · <strong style="color:var(--ink)">L3VPN의 PE-CE 구간(여기선 VRF Lite가 표준)</strong>.</p>
+    </section>
+
+    <!-- 5. L3VPN -->
+    <section id="s5" class="reveal">
+      <div class="sec-head"><div class="sec-num">05</div><h2>MPLS L3VPN (Full VRF) 심층 분석</h2></div>
+      <p><strong>MPLS L3VPN = VRF + MP-BGP(VPNv4) + MPLS 레이블 스위칭.</strong> 통신사 L3VPN 서비스의 표준(RFC 4364, 구 2547bis).</p>
+      <div class="callout key"><span class="tag">핵심 아이디어</span><p>"엣지(PE)만 VRF를 알고, 코어(P)는 VRF를 전혀 모른 채 <strong>레이블만 스위칭</strong>한다. 고객 라우트는 MP-BGP가 VPNv4로 PE 간에 운반하고, 데이터는 <strong>2단 레이블 스택</strong>으로 전달한다."</p></div>
+
+      <div class="diagram">
+        <div class="dt">MPLS L3VPN — 코어는 레이블, 엣지만 VRF</div>
+        <div class="topo">
+          <div class="node ce"><div class="box">CE</div></div>
+          <div class="link mpls"></div>
+          <div class="node pe"><div class="box">PE1</div><span class="vrfbadge">VRF</span></div>
+          <div class="link mpls"><span class="lk-lab">label</span></div>
+          <div class="node p"><div class="box">P</div><div class="lab">label only</div></div>
+          <div class="link mpls"><span class="lk-lab">label</span></div>
+          <div class="node p"><div class="box">P</div><div class="lab">label only</div></div>
+          <div class="link mpls"><span class="lk-lab">label</span></div>
+          <div class="node pe"><div class="box">PE2</div><span class="vrfbadge">VRF</span></div>
+          <div class="link mpls"></div>
+          <div class="node ce"><div class="box">CE</div></div>
+        </div>
+        <div class="mpbgp-arc">└──────── MP-BGP VPNv4 (PE 간 직접) ────────┘</div>
+      </div>
+
+      <h3><span class="pre">5.2</span> 역할(Role) 모델</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>장비</th><th>명칭</th><th>역할</th><th>VRF 인지</th></tr></thead>
+          <tbody>
+            <tr><td>CE</td><td>Customer Edge</td><td>고객 라우터</td><td class="dim">VRF 개념 없음</td></tr>
+            <tr><td>PE</td><td>Provider Edge</td><td>엣지. VRF 보유, MP-BGP, 레이블 부여</td><td><span class="yes">O</span></td></tr>
+            <tr><td>P</td><td>Provider (core)</td><td>코어. 레이블 스위칭만</td><td><span class="non">X</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3><span class="pre">5.3</span> 데이터 플레인 : 2단 레이블 스택</h3>
+      <div class="diagram">
+        <div class="dt">PE가 패킷을 코어로 보낼 때 — 레이블 2개</div>
+        <div class="stack">
+          <div class="lblbox t"><b>Transport Label</b><small>LDP/SR · P가 hop-by-hop 전달<br>(PHP: 마지막 직전 pop)</small></div>
+          <span class="stackplus">+</span>
+          <div class="lblbox v"><b>VPN Label</b><small>도착 PE가 어느 VRF인지 식별<br>MP-BGP가 함께 배포</small></div>
+          <span class="stackplus">+</span>
+          <div class="lblbox d"><b>IP Packet</b><small>원본 고객 페이로드</small></div>
+        </div>
+        <p style="text-align:center;margin:18px 0 0;font-size:.86rem;color:var(--ink-dim)">결과적으로 <strong>P 라우터는 고객 IP/VRF를 전혀 몰라도 된다.</strong> ← 확장성의 핵심</p>
+      </div>
+
+      <h3><span class="pre">5.4</span> 컨트롤 플레인 : MP-BGP VPNv4</h3>
+      <div class="codewrap">
+        <div class="codebar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">vpnv4-advertisement</span><span class="lang">flow</span></div>
+        <pre><code class="lang-plain">PE1 (CUST_A: 10.1.1.0/24)
+   → RD 65000:1 부착 → VPNv4: 65000:1:10.1.1.0/24
+   → RT 65000:100 태그
+   → MP-BGP(VPNv4)로 PE2에 광고  + VPN label
+PE2: import RT 65000:100 매칭 → VRF CUST_A RIB에 설치</code></pre>
+      </div>
+
+      <div class="grid g2" style="margin-top:24px">
+        <div class="card" style="border-color:rgba(52,211,153,.3)">
+          <h4 style="margin:0 0 10px;color:var(--ok)">▲ 장점</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--ink-dim);font-size:.92rem;line-height:2">
+            <li><strong>대규모 확장성</strong> — 수천 VRF, 수백 PE</li>
+            <li><strong>코어 단순화</strong> — VRF 추가해도 코어 무변경</li>
+            <li><strong>풍부한 토폴로지</strong> — RT로 자유 구현</li>
+            <li>MPLS-TE · FRR · QoS · Inter-AS/CSC</li>
+          </ul>
+        </div>
+        <div class="card" style="border-color:rgba(251,113,133,.3)">
+          <h4 style="margin:0 0 10px;color:var(--no)">▼ 단점</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--ink-dim);font-size:.92rem;line-height:2">
+            <li><strong>높은 진입장벽</strong> — MPLS·MP-BGP·RD/RT 역량</li>
+            <li><strong>장비/라이선스</strong> — MPLS 지원 플랫폼 필요</li>
+            <li><strong>초기 구축 복잡</strong> — 소규모엔 과설계</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. plane compare -->
+    <section id="s6" class="reveal">
+      <div class="sec-head"><div class="sec-num">06</div><h2>컨트롤 플레인 / 데이터 플레인 비교</h2></div>
+      <h3><span class="pre">6.1</span> 데이터 플레인</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>항목</th><th class="lite">VRF Lite</th><th>MPLS L3VPN</th></tr></thead>
+          <tbody>
+            <tr><td>전송 방식</td><td class="lite">네이티브 IP</td><td>MPLS 레이블 스위칭</td></tr>
+            <tr><td>VRF 구분(와이어)</td><td class="lite">802.1Q VLAN 태그 / 물리 IF</td><td>내부(VPN) 레이블</td></tr>
+            <tr><td>코어 포워딩</td><td class="lite">IP lookup (VRF별 FIB)</td><td>레이블 swap (VRF 무관)</td></tr>
+            <tr><td>중간 장비 부담</td><td class="lite">VRF별 FIB 전부 보유</td><td>레이블 테이블만</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3><span class="pre">6.2</span> 컨트롤 플레인</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>항목</th><th class="lite">VRF Lite</th><th>MPLS L3VPN</th></tr></thead>
+          <tbody>
+            <tr><td>라우트 배포</td><td class="lite">VRF별 IGP/eBGP, hop-by-hop</td><td>MP-BGP VPNv4 (PE 간)</td></tr>
+            <tr><td>RD 사용</td><td class="lite">설정하나 사실상 미활용</td><td><span class="yes">필수</span> (VPNv4 유일성)</td></tr>
+            <tr><td>RT 사용</td><td class="lite">일반적으로 미사용</td><td><span class="yes">필수</span> (import/export 정책)</td></tr>
+            <tr><td>레이블 프로토콜</td><td class="lite">없음</td><td>LDP / SR (transport) + BGP(VPN)</td></tr>
+            <tr><td>코어 VRF 인지</td><td class="lite">모든 hop</td><td>PE만</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 7. master table -->
+    <section id="s7" class="reveal">
+      <div class="sec-head"><div class="sec-num">07</div><h2>종합 비교표</h2></div>
+      <div class="tw">
+        <table>
+          <thead><tr><th>비교 항목</th><th class="lite">VRF Lite</th><th>MPLS L3VPN (Full VRF)</th></tr></thead>
+          <tbody>
+            <tr><td>정식 명칭</td><td class="lite">Multi-VRF CE / VRF-Lite</td><td>MPLS L3VPN (RFC 4364)</td></tr>
+            <tr><td>데이터 플레인</td><td class="lite">네이티브 IP + 802.1Q</td><td>MPLS 2단 레이블 스택</td></tr>
+            <tr><td>컨트롤 플레인</td><td class="lite">VRF별 IGP/BGP (hop-by-hop)</td><td>MP-BGP VPNv4 (PE-to-PE)</td></tr>
+            <tr><td>MPLS 필요</td><td class="lite"><span class="non">❌ 불필요</span></td><td><span class="yes">✅ 필수</span></td></tr>
+            <tr><td>MP-BGP 필요</td><td class="lite"><span class="non">❌ (선택)</span></td><td><span class="yes">✅ 필수</span></td></tr>
+            <tr><td>RD 활용</td><td class="lite">설정만, 실질 미활용</td><td><span class="yes">✅ 핵심</span></td></tr>
+            <tr><td>RT 활용</td><td class="lite">일반적으로 미사용</td><td><span class="yes">✅ 핵심 (정책)</span></td></tr>
+            <tr><td>코어(중간) 장비 VRF 인지</td><td class="lite"><strong>모든 장비</strong></td><td><strong>PE만</strong> (P는 모름)</td></tr>
+            <tr><td>VRF 추가 시 작업 범위</td><td class="lite">경로상 <strong>모든 장비</strong></td><td><strong>양 끝 PE만</strong></td></tr>
+            <tr><td>확장성</td><td class="lite">낮음 (수~수십 VRF)</td><td><span class="yes">매우 높음 (수천 VRF)</span></td></tr>
+            <tr><td>설정 복잡도(개념)</td><td class="lite">낮음</td><td>높음</td></tr>
+            <tr><td>운영 복잡도(규모 확대 시)</td><td class="lite"><span class="non">급격히 증가</span></td><td>상대적으로 일정</td></tr>
+            <tr><td>트래픽 엔지니어링</td><td class="lite"><span class="non">❌</span></td><td><span class="yes">✅ (MPLS-TE/FRR)</span></td></tr>
+            <tr><td>장비 요구사항</td><td class="lite">광범위(L3 스위치 등)</td><td>MPLS 지원 플랫폼</td></tr>
+            <tr><td>대표 적용처</td><td class="lite">캠퍼스/DC/엔터프라이즈 분리</td><td>통신사 백본, 대규모 WAN</td></tr>
+            <tr><td>비용/진입장벽</td><td class="lite">낮음</td><td>높음</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 8. config -->
+    <section id="s8" class="reveal">
+      <div class="sec-head"><div class="sec-num">08</div><h2>설정 예시 — Cisco IOS / IOS-XE</h2></div>
+      <div class="callout info"><span class="tag">문법</span><p>최신 통합 문법은 <code class="inl">vrf definition</code> + <code class="inl">vrf forwarding</code> 이다. (구 문법: <code class="inl">ip vrf</code> + <code class="inl">ip vrf forwarding</code>)</p></div>
+
+      <h3><span class="pre">8.1</span> VRF 정의 (공통)</h3>
+      <div class="codewrap"><div class="codebar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">vrf-definition.cfg</span><span class="lang">cisco</span></div>
+<pre><code class="lang-cisco">vrf definition CUST_RED
+ rd 65000:1
+ address-family ipv4
+ exit-address-family
+!
+vrf definition CUST_BLUE
+ rd 65000:2
+ address-family ipv4
+ exit-address-family</code></pre></div>
+
+      <h3><span class="pre">8.2</span> VRF Lite — 인터페이스 &amp; 라우팅</h3>
+      <div class="codewrap"><div class="codebar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">vrf-lite.cfg</span><span class="lang">cisco</span></div>
+<pre><code class="lang-cisco">! ─ 802.1Q 서브인터페이스로 VRF별 분리 ─
+interface GigabitEthernet0/0.10
+ encapsulation dot1Q 10
+ vrf forwarding CUST_RED
+ ip address 10.1.1.1 255.255.255.0
+!
+interface GigabitEthernet0/0.20
+ encapsulation dot1Q 20
+ vrf forwarding CUST_BLUE
+ ip address 10.1.1.1 255.255.255.0     ! ← RED와 중복 IP, 문제 없음
+!
+! ─ VRF별 OSPF 프로세스 (서로 독립) ─
+router ospf 10 vrf CUST_RED
+ network 10.1.1.0 0.0.0.255 area 0
+!
+router ospf 20 vrf CUST_BLUE
+ network 10.1.1.0 0.0.0.255 area 0</code></pre></div>
+      <p class="dim">이 구성을 <strong style="color:var(--ink)">경로상의 모든 장비에 반복</strong>해야 한다는 점이 VRF Lite의 본질적 부담이다.</p>
+
+      <h3><span class="pre">8.3</span> MPLS L3VPN — PE 라우터</h3>
+      <div class="codewrap"><div class="codebar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">pe-l3vpn.cfg</span><span class="lang">cisco</span></div>
+<pre><code class="lang-cisco">! ─ VRF에 RT 추가 (import/export 정책) ─
+vrf definition CUST_RED
+ rd 65000:1
+ route-target export 65000:100
+ route-target import 65000:100
+ address-family ipv4
+ exit-address-family
+!
+! ─ 코어 인터페이스: MPLS 활성화 ─
+interface GigabitEthernet0/2
+ ip address 172.16.0.1 255.255.255.252
+ mpls ip
+!
+! ─ 고객(CE) 대면 인터페이스: VRF 소속 ─
+interface GigabitEthernet0/1
+ vrf forwarding CUST_RED
+ ip address 10.1.1.1 255.255.255.0
+!
+! ─ MP-BGP: VPNv4 + VRF별 PE-CE ─
+router bgp 65000
+ neighbor 2.2.2.2 remote-as 65000          ! 다른 PE (loopback)
+ neighbor 2.2.2.2 update-source Loopback0
+ !
+ address-family vpnv4
+  neighbor 2.2.2.2 activate
+  neighbor 2.2.2.2 send-community extended  ! RT 전달 필수
+ exit-address-family
+ !
+ address-family ipv4 vrf CUST_RED
+  redistribute connected
+  neighbor 10.1.1.2 remote-as 65001         ! CE와 eBGP
+  neighbor 10.1.1.2 activate
+ exit-address-family</code></pre></div>
+
+      <h3><span class="pre">8.4</span> 검증 명령어</h3>
+      <div class="codewrap"><div class="codebar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">verify.sh</span><span class="lang">cisco</span></div>
+<pre><code class="lang-cisco">show vrf                         ! VRF 목록/인터페이스
+show ip route vrf CUST_RED       ! VRF별 라우팅 테이블
+show ip cef vrf CUST_RED         ! VRF별 포워딩
+show bgp vpnv4 unicast all       ! VPNv4 라우트 (L3VPN)
+show mpls forwarding-table       ! 레이블 테이블 (L3VPN)
+ping vrf CUST_RED 10.1.1.2       ! VRF 컨텍스트 ping
+traceroute vrf CUST_RED 10.1.1.2</code></pre></div>
+    </section>
+
+    <!-- 9. route leaking -->
+    <section id="s9" class="reveal">
+      <div class="sec-head"><div class="sec-num">09</div><h2>VRF 간 라우트 누수 (Route Leaking)</h2></div>
+      <p>완전 분리가 원칙이지만, 공유 서비스(인터넷·DNS·인증)를 위해 VRF 간 <strong>선택적 통신</strong>이 필요할 때가 있다.</p>
+
+      <h3><span class="pre">9.1</span> MPLS L3VPN / MP-BGP — RT 기반 누수 <span class="dim">(권장)</span></h3>
+      <div class="codewrap"><div class="codebar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">rt-leak.cfg</span><span class="lang">cisco</span></div>
+<pre><code class="lang-cisco">vrf definition CUST_RED
+ route-target export 65000:100
+ route-target import 65000:100
+ route-target import 65000:999    ! ← SHARED 서비스 라우트 가져오기
+!
+vrf definition SHARED_SVC
+ route-target export 65000:999
+ route-target import 65000:999
+ route-target import 65000:100    ! ← CUST_RED 라우트 가져오기</code></pre></div>
+      <p class="dim">RT의 import/export 조합만으로 깔끔하게 누수를 제어한다. (확장 가능, 정책적)</p>
+
+      <h3><span class="pre">9.2</span> VRF Lite / 순수 IP — 정적 라우트 누수</h3>
+      <div class="codewrap"><div class="codebar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">static-leak.cfg</span><span class="lang">cisco</span></div>
+<pre><code class="lang-cisco">! VRF 간, 또는 VRF ↔ 글로벌 테이블 누수
+ip route vrf CUST_RED 0.0.0.0 0.0.0.0 GigabitEthernet0/3 192.168.1.1 global
+ip route vrf SHARED 10.1.1.0 255.255.255.0 GigabitEthernet0/1 10.1.1.1</code></pre></div>
+      <p class="dim"><code class="inl">global</code> 키워드: VRF에서 글로벌 라우팅 테이블로 누수(인터넷 브레이크아웃에 흔함). 정적 누수는 단순하지만 <strong style="color:var(--ink)">확장성이 나쁘고</strong> 동적 변화에 약하다.</p>
+      <div class="callout warn"><span class="tag">⚠️ 주의</span><p>라우트 누수는 VRF의 격리 목적을 의도적으로 깨는 행위다. 보안 세그멘테이션 용도라면 누수 지점에 <strong>방화벽/ACL</strong>을 반드시 둔다.</p></div>
+    </section>
+
+    <!-- 10. architect -->
+    <section id="s10" class="reveal">
+      <div class="sec-head"><div class="sec-num">10</div><h2>아키텍트 관점 : 언제 무엇을 선택할 것인가</h2></div>
+      <h3><span class="pre">10.1</span> 의사결정 기준</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>질문</th><th class="lite">VRF Lite로 기운다</th><th>MPLS L3VPN으로 기운다</th></tr></thead>
+          <tbody>
+            <tr><td>VRF 개수가 몇 개인가?</td><td class="lite">수 개~수십 개</td><td>수십~수천 개</td></tr>
+            <tr><td>경로상 중간 장비(hop) 수는?</td><td class="lite">적음 (1~3 hop)</td><td>많음 (멀티홉 백본)</td></tr>
+            <tr><td>MPLS 운영 역량/장비가 있는가?</td><td class="lite">없음</td><td>있음</td></tr>
+            <tr><td>트래픽 엔지니어링/FRR 필요?</td><td class="lite">불필요</td><td>필요</td></tr>
+            <tr><td>망 규모/성장 전망</td><td class="lite">정적, 소규모</td><td>성장, 대규모</td></tr>
+            <tr><td>운영 조직 성숙도</td><td class="lite">낮음~중간</td><td>높음</td></tr>
+            <tr><td>비용 민감도</td><td class="lite">높음</td><td>상대적으로 낮음</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3><span class="pre">10.2</span> 전형적 설계 패턴</h3>
+      <div class="grid g2">
+        <div class="mini"><div class="ic">🏫</div><h5>엔터프라이즈 캠퍼스</h5><p>VRF Lite로 게스트/IoT/직원/OT/관리망 분리. 코어가 작고 VRF가 적어 적합.</p></div>
+        <div class="mini"><div class="ic">🏬</div><h5>데이터센터</h5><p>소규모는 VRF Lite, 대규모/멀티테넌트는 <strong>EVPN/VXLAN</strong>으로 진화.</p></div>
+        <div class="mini"><div class="ic">🛰️</div><h5>통신사/대기업 WAN 백본</h5><p>MPLS L3VPN이 표준. 다수 지점·다수 고객 VRF.</p></div>
+        <div class="mini"><div class="ic">🔗</div><h5>하이브리드 (실전 다수)</h5><p>코어는 L3VPN, 캠퍼스 엣지는 VRF Lite(PE-CE)로 연계.</p></div>
+      </div>
+
+      <h3><span class="pre">10.3</span> 안티패턴 — 피해야 할 설계</h3>
+      <div class="grid g2">
+        <div class="card" style="border-color:rgba(251,113,133,.3)"><span class="non">❌</span> <strong>대규모 VRF를 VRF Lite로 백본 전체에 확장</strong> — hop마다 수십 개 서브인터페이스 → 설정·장애·운영 지옥.</div>
+        <div class="card" style="border-color:rgba(251,113,133,.3)"><span class="non">❌</span> <strong>소규모 분리에 MPLS L3VPN 풀스택 도입</strong> — 과설계, 운영 부담만 증가.</div>
+        <div class="card" style="border-color:rgba(251,113,133,.3)"><span class="non">❌</span> <strong>라우트 누수 남발로 격리 무력화</strong> — VRF 도입 의미 상실 + 보안 구멍.</div>
+        <div class="card" style="border-color:rgba(251,113,133,.3)"><span class="non">❌</span> <strong>RD를 RT처럼 정책 도구로 오해</strong> — RD는 유일성, RT가 정책.</div>
+      </div>
+    </section>
+
+    <!-- 11. ops -->
+    <section id="s11" class="reveal">
+      <div class="sec-head"><div class="sec-num">11</div><h2>확장성 · 운영 · 트러블슈팅</h2></div>
+      <h3><span class="pre">11.1</span> 확장성 수치 감각</h3>
+      <div class="grid g2">
+        <div class="card lite" style="background:linear-gradient(160deg,rgba(34,211,238,.08),transparent);border-color:rgba(34,211,238,.3)">
+          <h5 style="margin:0 0 8px;color:var(--lite1)">VRF Lite</h5>
+          <p style="margin:0;color:var(--ink-dim);font-size:.92rem">"VRF 수 × 경로상 장비 수 × 인접성"이 곱셈으로 증가. 실무상 <strong style="color:var(--ink)">VRF 8~16개, hop 3개 이하</strong>를 넘으면 관리가 급격히 어려워진다.</p>
+        </div>
+        <div class="card vpn" style="background:linear-gradient(160deg,rgba(168,85,247,.08),transparent);border-color:rgba(168,85,247,.3)">
+          <h5 style="margin:0 0 8px;color:var(--vpn1)">MPLS L3VPN</h5>
+          <p style="margin:0;color:var(--ink-dim);font-size:.92rem">PE의 VRF/RIB 용량과 <strong style="color:var(--ink)">RR(Route Reflector)</strong> 설계가 한계를 좌우. 수천 VRF도 정상 운용.</p>
+        </div>
+      </div>
+
+      <h3><span class="pre">11.2</span> 운영 관점 체크포인트</h3>
+      <ul class="dim" style="line-height:2;font-size:.92rem">
+        <li><strong style="color:var(--ink)">VRF 컨텍스트 인지</strong> — ping/traceroute/ssh 시 반드시 <code class="inl">vrf</code> 키워드. 글로벌에서 쏘면 도달 불가.</li>
+        <li><strong style="color:var(--ink)">MTU</strong> — MPLS 레이블(4B/레이블) MTU 감소, 코어 점보프레임 권장. VRF Lite는 802.1Q(4B) 고려.</li>
+        <li><strong style="color:var(--ink)">관리망</strong> — <code class="inl">Mgmt-vrf</code> 분리 시 NTP/SNMP/AAA/Syslog 소스 인터페이스를 VRF로 명시.</li>
+        <li><strong style="color:var(--ink)">재분배</strong> — VRF별 IGP↔BGP 재분배 루프/서브옵티멀 라우팅 주의.</li>
+      </ul>
+
+      <h3><span class="pre">11.3</span> 트러블슈팅 플로우</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>#</th><th>점검</th><th>명령어</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>VRF에 인터페이스가 올바로 소속됐는가?</td><td><code class="inl">show vrf</code></td></tr>
+            <tr><td>2</td><td>VRF RIB에 라우트가 있는가?</td><td><code class="inl">show ip route vrf X</code></td></tr>
+            <tr><td>3</td><td>(L3VPN) VPNv4로 광고/수신되는가?</td><td><code class="inl">show bgp vpnv4 unicast all</code></td></tr>
+            <tr><td>4</td><td>(L3VPN) RT import/export가 일치하는가?</td><td><code class="inl">show vrf detail</code></td></tr>
+            <tr><td>5</td><td>(L3VPN) 레이블이 제대로 박혔는가?</td><td><code class="inl">show mpls forwarding-table</code></td></tr>
+            <tr><td>6</td><td>데이터 플레인 검증</td><td><code class="inl">ping vrf X</code> · <code class="inl">traceroute vrf X</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3><span class="pre">11.4</span> 흔한 실수</h3>
+      <div class="grid g2">
+        <div class="card" style="font-size:.9rem">L3VPN에서 <code class="inl">send-community extended</code> 누락 → RT 전달 안 됨 → import 실패.</div>
+        <div class="card" style="font-size:.9rem">VRF Lite에서 <code class="inl">encapsulation dot1Q</code> 또는 양단 VLAN 불일치.</div>
+        <div class="card" style="font-size:.9rem"><code class="inl">vrf forwarding</code> 적용 시 <strong>기존 IP 제거됨</strong> → 재설정 필요(운영 중 끊김).</div>
+        <div class="card" style="font-size:.9rem">글로벌 테이블 기준 관리 접속 시도 → VRF 도달성 실패.</div>
+      </div>
+    </section>
+
+    <!-- 12. modern -->
+    <section id="s12" class="reveal">
+      <div class="sec-head"><div class="sec-num">12</div><h2>현대적 대안 : EVPN/VXLAN · SR · SD-WAN</h2></div>
+      <p>VRF의 "L3 세그멘테이션" 요구는 현대 아키텍처에서 다음으로 진화/대체되고 있다.</p>
+      <div class="grid g3">
+        <div class="mini"><div class="ic">🧬</div><h5>EVPN / VXLAN <span class="dim">(DC)</span></h5><p>VXLAN VNI로 L2/L3 오버레이, <strong>VRF는 L3VNI에 매핑</strong>. MP-BGP EVPN이 컨트롤 플레인. 대규모 멀티테넌트 DC의 사실상 표준.</p></div>
+        <div class="mini"><div class="ic">➡️</div><h5>SR-MPLS / SRv6</h5><p>LDP를 SR로 대체해 코어 단순화·TE 강화. <strong>L3VPN 개념은 그대로</strong>, transport만 SR.</p></div>
+        <div class="mini"><div class="ic">☁️</div><h5>SD-WAN</h5><p>VRF/세그먼트를 <strong>오버레이 터널 + 중앙 컨트롤러</strong>로 추상화. 지점 간 세그멘테이션을 정책으로 관리.</p></div>
+      </div>
+      <div class="callout key"><span class="tag">정리</span><p>VRF Lite ↔ MPLS L3VPN의 선택 논리는, DC에서는 <strong>"플랫 VRF Lite ↔ EVPN/VXLAN"</strong>, WAN에서는 <strong>"MPLS L3VPN ↔ SR/SD-WAN"</strong> 으로 형태만 바뀌어 동일하게 반복된다.</p></div>
+    </section>
+
+    <!-- 13. checklist -->
+    <section id="s13" class="reveal">
+      <div class="sec-head"><div class="sec-num">13</div><h2>설계 체크리스트</h2></div>
+      <p class="dim">클릭하여 진행 상황을 체크할 수 있습니다.</p>
+      <div class="checklist">
+        <label><input type="checkbox"><span>분리해야 할 <strong>테넌트/세그먼트 수</strong>와 <strong>향후 증가 전망</strong>을 산정했는가?</span></label>
+        <label><input type="checkbox"><span>경로상 <strong>중간 장비(hop) 수</strong>와 각 장비의 <strong>VRF/라우팅 용량</strong>을 확인했는가?</span></label>
+        <label><input type="checkbox"><span><strong>MPLS 지원 장비/라이선스/운영 역량</strong> 보유 여부를 확인했는가?</span></label>
+        <label><input type="checkbox"><span><strong>RD 체계</strong>(유일성)와 <strong>RT 체계</strong>(토폴로지 정책)를 설계했는가? (L3VPN)</span></label>
+        <label><input type="checkbox"><span><strong>공유 서비스/인터넷 브레이크아웃</strong>의 라우트 누수 방식과 보안 통제를 정의했는가?</span></label>
+        <label><input type="checkbox"><span><strong>관리망(Mgmt-vrf)</strong> 분리 및 소스 인터페이스 정책을 정의했는가?</span></label>
+        <label><input type="checkbox"><span><strong>MTU/점보프레임</strong>(MPLS 레이블, 802.1Q) 영향을 검토했는가?</span></label>
+        <label><input type="checkbox"><span><strong>장애·확장 시 작업 범위</strong>(VRF Lite=전 구간 / L3VPN=PE)를 운영팀과 합의했는가?</span></label>
+        <label><input type="checkbox"><span>향후 <strong>EVPN/VXLAN, SR, SD-WAN</strong> 마이그레이션 경로를 고려했는가?</span></label>
+      </div>
+    </section>
+
+    <!-- 14. glossary -->
+    <section id="s14" class="reveal">
+      <div class="sec-head"><div class="sec-num">14</div><h2>용어 정리</h2></div>
+      <div class="tw">
+        <table>
+          <thead><tr><th>용어</th><th>영문</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>VRF</td><td>Virtual Routing and Forwarding</td><td>장비 내 독립 라우팅/포워딩 인스턴스</td></tr>
+            <tr><td>VRF Lite</td><td>Multi-VRF CE</td><td>MPLS 없이 hop-by-hop으로 VRF 확장</td></tr>
+            <tr><td>L3VPN</td><td>Layer 3 VPN (RFC 4364)</td><td>VRF+MP-BGP+MPLS 기반 대규모 VPN</td></tr>
+            <tr><td>RD</td><td>Route Distinguisher</td><td>프리픽스에 붙어 VPNv4 유일성 부여(64bit)</td></tr>
+            <tr><td>RT</td><td>Route Target</td><td>import/export 정책용 BGP Extended Community</td></tr>
+            <tr><td>RIB</td><td>Routing Information Base</td><td>라우팅 테이블</td></tr>
+            <tr><td>FIB</td><td>Forwarding Information Base</td><td>포워딩 테이블(CEF)</td></tr>
+            <tr><td>PE</td><td>Provider Edge</td><td>VRF 보유 엣지 라우터</td></tr>
+            <tr><td>P</td><td>Provider</td><td>레이블만 스위칭하는 코어 라우터</td></tr>
+            <tr><td>CE</td><td>Customer Edge</td><td>고객 라우터</td></tr>
+            <tr><td>MP-BGP</td><td>Multiprotocol BGP</td><td>VPNv4 등 다중 패밀리 운반 BGP</td></tr>
+            <tr><td>VPNv4</td><td>—</td><td>RD(64) + IPv4(32) = 96bit 프리픽스</td></tr>
+            <tr><td>LDP</td><td>Label Distribution Protocol</td><td>transport 레이블 배포</td></tr>
+            <tr><td>SR</td><td>Segment Routing</td><td>LDP 대체, 소스 라우팅 기반</td></tr>
+            <tr><td>PHP</td><td>Penultimate Hop Popping</td><td>마지막 직전 홉에서 외부 레이블 제거</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top:34px">참고 표준 / 문서</h3>
+      <div class="refs">
+        <div class="ref"><span class="badge">RFC 4364</span> BGP/MPLS IP Virtual Private Networks (VPNs)</div>
+        <div class="ref"><span class="badge">RFC 4760</span> Multiprotocol Extensions for BGP-4 (MP-BGP)</div>
+        <div class="ref"><span class="badge">RFC 7432</span> BGP MPLS-Based Ethernet VPN (EVPN)</div>
+        <div class="ref"><span class="badge">Cisco</span> VRF-Lite (Multi-VRF CE) Configuration Guide</div>
+        <div class="ref"><span class="badge">Cisco</span> MPLS Layer 3 VPNs Configuration Guide</div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="big">VRF vs VRF Lite — 네트워크 엔지니어 &amp; 아키텍트 관점 심층 분석</div>
+      <div>VRF Lite는 코어 전체에 VRF를 흩뿌리고, MPLS L3VPN은 코어를 레이블로 추상화한다.</div>
+    </footer>
+  </main>
+</div>
+
+<noscript><style>.reveal{opacity:1!important;transform:none!important}</style></noscript>
+<script>
+/* progress bar + back-to-top */
+const prog=document.getElementById('progress'), topBtn=document.getElementById('top');
+function onScroll(){
+  const h=document.documentElement, st=h.scrollTop, sh=h.scrollHeight-h.clientHeight;
+  prog.style.width=(st/sh*100)+'%';
+  topBtn.classList.toggle('show', st>600);
+}
+addEventListener('scroll',onScroll,{passive:true}); onScroll();
+topBtn.onclick=()=>scrollTo({top:0,behavior:'smooth'});
+
+/* theme toggle */
+const tBtn=document.getElementById('themeBtn'), root=document.documentElement;
+tBtn.onclick=()=>{
+  const light=root.getAttribute('data-theme')==='light';
+  root.setAttribute('data-theme', light?'dark':'light');
+  tBtn.textContent= light?'🌙':'☀️';
+};
+
+/* reveal on scroll */
+if('IntersectionObserver' in window){
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}})},{threshold:.08});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+}else{document.querySelectorAll('.reveal').forEach(el=>el.classList.add('in'));}
+
+/* active TOC via section observe */
+const links=[...document.querySelectorAll('.toc a')];
+const map={}; links.forEach(a=>map[a.getAttribute('href').slice(1)]=a);
+if('IntersectionObserver' in window){
+  const so=new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){ links.forEach(l=>l.classList.remove('active')); const a=map[e.target.id]; if(a)a.classList.add('active'); }});
+  },{rootMargin:'-30% 0px -65% 0px'});
+  document.querySelectorAll('section[id]').forEach(s=>so.observe(s));
+}
+
+/* Cisco config syntax highlighter */
+const KW=new Set(('vrf definition forwarding rd route-target export import address-family exit-address-family ipv4 vpnv4 unicast interface encapsulation dot1Q ip address router ospf bgp eigrp network area neighbor remote-as update-source activate send-community extended redistribute connected mpls route global show ping traceroute all detail cef forwarding-table mask Loopback0').split(' '));
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function hiCisco(raw){
+  return raw.split('\n').map(line=>{
+    let code=line, cmt='';
+    const bang=line.indexOf('!');
+    if(bang>-1){ code=line.slice(0,bang); cmt=line.slice(bang); }
+    let out=esc(code).replace(/(\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)|(\b\d+:\d+\b)|(\b\d+\b)|([A-Za-z][\w\-]*)/g,
+      (m,ip,rd,num,word)=>{
+        if(ip) return '<span class="t-ip">'+ip+'</span>';
+        if(rd) return '<span class="t-num">'+rd+'</span>';
+        if(num) return '<span class="t-num">'+num+'</span>';
+        if(word) return KW.has(word)?'<span class="t-kw">'+word+'</span>':word;
+        return m;
+      });
+    if(cmt) out+='<span class="t-cmt">'+esc(cmt)+'</span>';
+    return out;
+  }).join('\n');
+}
+document.querySelectorAll('code.lang-cisco').forEach(c=>{ c.innerHTML=hiCisco(c.textContent); });
+</script>
+</body>
+</html>

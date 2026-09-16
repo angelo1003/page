@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iperf / iperf3 완전 정리 — 네트워크 성능 측정 도구 기술 가이드</title>
+<style>
+:root{
+  --bg:#0a0e17; --bg-2:#0f1521; --panel:#121a28; --panel-2:#16202f;
+  --border:#243044; --border-2:#2e3c54;
+  --txt:#dce3ee; --txt-dim:#9fb0c6; --txt-faint:#6c7d96;
+  --accent:#16c7c1; --accent-2:#1ba0e2; --accent-3:#6f6cf6;
+  --ok:#22c98a; --warn:#f5b942; --danger:#f0556b; --info:#3aa0ff; --tip:#28d3a0;
+  --code-bg:#0b111c; --code-border:#1f2c40;
+  --shadow:0 10px 40px rgba(0,0,0,.45);
+  --mono:"SF Mono", "JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo",Roboto,"Noto Sans KR",sans-serif;
+  --sidebar-w:300px;
+}
+html[data-theme="light"]{
+  --bg:#eef2f7; --bg-2:#e6ecf3; --panel:#ffffff; --panel-2:#f5f8fc;
+  --border:#d4dde8; --border-2:#c2cfde;
+  --txt:#15212f; --txt-dim:#41546b; --txt-faint:#71839a;
+  --code-bg:#0b111c; --code-border:#1f2c40;
+  --shadow:0 8px 30px rgba(40,60,90,.12);
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(27,160,226,.22), transparent 60%),
+    radial-gradient(1000px 500px at -10% 10%, rgba(111,108,246,.15), transparent 60%),
+    var(--bg);
+  color:var(--txt); font-family:var(--sans); font-size:16px; line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{display:flex;max-width:1500px;margin:0 auto;gap:0}
+.sidebar{
+  width:var(--sidebar-w);flex:0 0 var(--sidebar-w);position:sticky;top:0;height:100vh;
+  overflow-y:auto;padding:26px 18px 60px;border-right:1px solid var(--border);
+  background:linear-gradient(180deg,var(--bg-2),var(--bg));backdrop-filter:blur(6px);
+}
+main{flex:1 1 auto;min-width:0;padding:0 0 120px}
+.content{max-width:980px;margin:0 auto;padding:0 30px}
+section{scroll-margin-top:70px;margin:54px 0}
+
+/* Sidebar internals */
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.brand .logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
+  font-family:var(--mono);font-weight:800;font-size:15px;color:#fff;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));flex:0 0 auto}
+.brand div{font-weight:700;font-size:15px;color:var(--txt);line-height:1.3}
+.brand small{display:block;font-weight:500;font-size:11.5px;color:var(--txt-faint);margin-top:1px}
+.side-meta{font-family:var(--mono);font-size:11px;color:var(--txt-faint);
+  padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:22px;
+  background:var(--panel)}
+.toc-title{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--txt-faint);
+  margin:0 0 10px 4px}
+nav.toc{display:flex;flex-direction:column;gap:3px}
+nav.toc a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;
+  color:var(--txt-dim);text-decoration:none;font-size:13.5px;transition:.15s;
+  border:1px solid transparent}
+nav.toc a:hover{background:var(--panel);color:var(--txt);border-color:var(--border)}
+nav.toc a.active{background:linear-gradient(90deg,rgba(22,199,193,.14),rgba(27,160,226,.06));
+  color:var(--accent);border-color:rgba(22,199,193,.35);font-weight:600}
+nav.toc .num{font-family:var(--mono);font-size:10.5px;color:var(--txt-faint);
+  background:var(--bg-2);border:1px solid var(--border);border-radius:5px;
+  padding:2px 5px;flex:0 0 auto}
+nav.toc a.active .num{color:var(--accent);border-color:rgba(22,199,193,.4)}
+nav.toc a.ref-link{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);
+  font-size:12.5px;color:var(--txt-faint)}
+
+/* progress */
+#progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:200;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2),var(--accent-3));
+  box-shadow:0 0 12px rgba(22,199,193,.55)}
+
+/* topbar */
+.topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+  padding:12px 30px;border-bottom:1px solid var(--border);
+  background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(10px)}
+.crumb{font-family:var(--mono);font-size:12.5px;color:var(--txt-faint);flex:0 0 auto}
+.btn{background:var(--panel);border:1px solid var(--border);color:var(--txt-dim);
+  border-radius:9px;padding:8px 12px;font-size:13px;cursor:pointer;display:inline-flex;
+  align-items:center;gap:6px;transition:.15s}
+.btn:hover{border-color:var(--border-2);color:var(--txt)}
+.mobile-toggle{display:none}
+.search{display:flex;align-items:center;gap:8px;flex:1 1 auto;max-width:340px;
+  background:var(--panel);border:1px solid var(--border);border-radius:9px;
+  padding:7px 12px;color:var(--txt-faint)}
+.search svg{width:16px;height:16px;flex:0 0 auto}
+.search input{border:none;background:none;outline:none;color:var(--txt);font-size:13.5px;
+  width:100%;font-family:var(--sans)}
+.search input::placeholder{color:var(--txt-faint)}
+
+/* hero */
+.hero{border-radius:20px;padding:34px 30px;position:relative;overflow:hidden;margin-top:28px;
+  background:linear-gradient(140deg,var(--panel-2),var(--panel));
+  border:1px solid var(--border-2)}
+.hero .eyebrow{font-size:12px;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;
+  font-weight:700}
+.hero h2{font-size:38px;line-height:1.15;font-weight:800;letter-spacing:-.5px;margin:14px 0 12px}
+.hero .grad{background:linear-gradient(100deg,var(--accent),var(--accent-3));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .lead{color:var(--txt-dim);font-size:15.5px;max-width:720px;margin:0 0 18px}
+.chips{display:flex;flex-wrap:wrap;gap:9px}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--txt-dim);
+  background:var(--bg-2);border:1px solid var(--border);padding:6px 12px;border-radius:999px}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+
+/* section headers */
+section > h2.sec{font-size:27px;font-weight:780;letter-spacing:-.3px;display:flex;
+  align-items:center;gap:13px;margin:0 0 8px}
+section > h2.sec .idx{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--accent);
+  background:rgba(22,199,193,.12);border:1px solid rgba(22,199,193,.32);
+  padding:4px 10px;border-radius:8px;flex:0 0 auto}
+.sec-rule{height:1px;background:linear-gradient(90deg,var(--border-2),transparent 70%);
+  margin:0 0 22px}
+h3.sub{font-size:18.5px;font-weight:700;margin:30px 0 12px;color:var(--txt)}
+h4.subsub{font-size:15px;color:var(--accent-2);margin:22px 0 8px;font-weight:700}
+p{color:var(--txt-dim)}
+strong{color:var(--txt)}
+a{color:var(--accent-2)}
+code{font-family:var(--mono);font-size:.88em;background:var(--code-bg);
+  border:1px solid var(--code-border);color:var(--accent);padding:2px 6px;border-radius:5px}
+
+/* callout (B) */
+.callout{display:flex;gap:14px;margin:18px 0;padding:15px 18px;border-radius:13px;
+  border:1px solid var(--border);background:var(--panel);position:relative;overflow:hidden}
+.callout::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+.callout.note::before{background:var(--info)}
+.callout.tip::before{background:var(--tip)}
+.callout.warn::before{background:var(--warn)}
+.callout.danger::before{background:var(--danger)}
+.callout .ico{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:grid;
+  place-items:center;font-weight:800;font-size:13px;font-family:var(--mono)}
+.callout.note .ico{background:rgba(58,160,255,.15);color:var(--info)}
+.callout.tip .ico{background:rgba(40,211,160,.15);color:var(--tip)}
+.callout.warn .ico{background:rgba(245,185,66,.15);color:var(--warn)}
+.callout.danger .ico{background:rgba(240,85,107,.15);color:var(--danger)}
+.callout .body{flex:1 1 auto;min-width:0}
+.callout .lbl{font-size:11.5px;letter-spacing:1px;text-transform:uppercase;font-weight:800;
+  margin-bottom:4px}
+.callout.note .lbl{color:var(--info)}
+.callout.tip .lbl{color:var(--tip)}
+.callout.warn .lbl{color:var(--warn)}
+.callout.danger .lbl{color:var(--danger)}
+.callout p{margin:0;color:var(--txt-dim);font-size:14.5px}
+.callout p+p{margin-top:8px}
+
+/* term card */
+.term{background:var(--panel);border:1px solid var(--border);border-radius:13px;
+  padding:18px 20px;margin:18px 0}
+.term .t{font-weight:700;font-size:15.5px;color:var(--txt);margin-bottom:8px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.term .d{color:var(--txt-dim);font-size:14px}
+.term .formula{font-family:var(--mono);font-size:15px;color:var(--accent-3);
+  background:var(--code-bg);border:1px solid var(--code-border);border-radius:9px;
+  padding:12px 16px;margin:10px 0;line-height:1.8}
+.term .formula .op{color:var(--txt-faint)}
+.term .formula b{color:var(--accent)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);
+  font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--border-2)}
+.pill.anchor{color:var(--accent);border-color:rgba(22,199,193,.4);background:rgba(22,199,193,.08)}
+
+/* card grid (pitfalls) */
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin:20px 0}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+  padding:20px 22px;position:relative}
+.card h4{margin:0 0 8px;font-size:15.5px;color:var(--txt);display:flex;align-items:center;gap:8px}
+.card h4 .n{width:24px;height:24px;border-radius:7px;background:rgba(111,108,246,.15);
+  color:var(--accent-3);font-family:var(--mono);font-size:12px;font-weight:800;
+  display:grid;place-items:center;flex:0 0 auto}
+.card p{margin:0;font-size:13.8px;color:var(--txt-dim)}
+.card .code{margin-top:12px}
+
+/* cmp two-column contrast */
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}
+.cmp .side{border-radius:14px;padding:20px 22px;border:1px solid var(--border)}
+.cmp .side.a{background:linear-gradient(160deg,rgba(22,199,193,.10),var(--panel) 65%);
+  border-color:rgba(22,199,193,.30)}
+.cmp .side.b{background:linear-gradient(160deg,rgba(111,108,246,.10),var(--panel) 65%);
+  border-color:rgba(111,108,246,.30)}
+.cmp .side h4{margin:0 0 4px;font-size:16px;color:var(--txt)}
+.cmp .side .role{font-family:var(--mono);font-size:11.5px;color:var(--txt-faint);
+  margin-bottom:12px}
+.cmp .side ul{margin:0;padding-left:18px;color:var(--txt-dim);font-size:13.8px}
+.cmp .side li{margin:6px 0}
+.cmp .side.a .k{color:var(--accent)}
+.cmp .side.b .k{color:var(--accent-3)}
+
+/* table */
+.tbl-wrap{margin:18px 0;border:1px solid var(--border);border-radius:13px;
+  overflow:auto;box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+thead th{background:linear-gradient(180deg,var(--panel-2),var(--panel));color:var(--txt);
+  text-align:left;font-weight:700;padding:12px 15px;border-bottom:1px solid var(--border-2);
+  position:sticky;top:0;white-space:nowrap;font-size:12.5px;letter-spacing:.2px}
+tbody td{padding:11px 15px;border-bottom:1px solid var(--border);
+  color:var(--txt-dim);vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:nth-child(even){background:rgba(255,255,255,.015)}
+td code{white-space:nowrap}
+.yes{color:var(--ok);font-weight:700}
+.no{color:var(--danger);font-weight:700}
+.hot-cell{background:rgba(245,185,66,.08)}
+
+/* code block */
+.code{position:relative;margin:18px 0;border:1px solid var(--code-border);
+  border-radius:13px;overflow:hidden;background:var(--code-bg)}
+.code .bar{display:flex;align-items:center;gap:10px;padding:9px 14px;
+  border-bottom:1px solid var(--code-border);background:rgba(255,255,255,.02)}
+.code .dots{display:flex;gap:6px}
+.code .dots i{width:10px;height:10px;border-radius:50%;display:block}
+.code .dots i:nth-child(1){background:#ff5f56}
+.code .dots i:nth-child(2){background:#ffbd2e}
+.code .dots i:nth-child(3){background:#27c93f}
+.code .lang{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--txt-faint);
+  text-transform:uppercase;margin-left:2px}
+.code .copy{margin-left:auto;background:var(--panel);border:1px solid var(--border);
+  color:var(--txt-dim);font-size:11.5px;padding:5px 11px;border-radius:7px;cursor:pointer;
+  transition:.15s;font-family:var(--sans)}
+.code .copy:hover{border-color:var(--border-2);color:var(--txt)}
+.code .copy.done{color:var(--ok);border-color:rgba(34,201,138,.5)}
+.code pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);
+  font-size:13px;line-height:1.75;color:#cdd9ea}
+.code pre code{background:none;border:none;padding:0;color:inherit;font-size:inherit}
+.t-kw{color:var(--accent)}
+.t-attr{color:var(--accent-3)}
+.t-num{color:var(--warn)}
+.t-str{color:var(--tip)}
+.t-cmt{color:var(--txt-faint);font-style:italic}
+.t-tag{color:var(--accent-2)}
+pre.plain{background:var(--code-bg);border:1px solid var(--code-border);border-radius:13px;
+  padding:16px 18px;overflow-x:auto;margin:16px 0;font-family:var(--mono);font-size:13px;
+  line-height:1.75;color:#cdd9ea}
+
+/* steps */
+ol.steps{counter-reset:st;margin:18px 0;padding:0;list-style:none}
+ol.steps>li{counter-increment:st;position:relative;padding:4px 0 22px 46px}
+ol.steps>li:last-child{padding-bottom:2px}
+ol.steps>li::before{content:counter(st);position:absolute;left:0;top:0;
+  width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04191c;
+  font-family:var(--mono);font-weight:800;font-size:14px}
+ol.steps>li::after{content:"";position:absolute;left:14px;top:32px;bottom:2px;
+  width:2px;background:var(--border)}
+ol.steps>li:last-child::after{display:none}
+ol.steps .stt{font-weight:700;font-size:15.5px;color:var(--txt);margin-bottom:3px}
+ol.steps .loc{font-family:var(--mono);font-size:12px;color:var(--txt-faint);margin-bottom:8px}
+
+/* flow (diagnostic) */
+.flow{display:flex;flex-direction:column;align-items:center;gap:0;margin:20px 0}
+.flow .node{border:1px solid var(--border-2);border-radius:12px;padding:14px 22px;
+  background:var(--panel);text-align:center;min-width:300px;max-width:620px}
+.flow .node .nt{font-weight:700;font-size:14.5px;color:var(--txt);margin-bottom:4px}
+.flow .node .nd{font-size:13px;color:var(--txt-dim)}
+.flow .node.hot{border-color:var(--warn);
+  background:linear-gradient(160deg,rgba(245,185,66,.12),var(--panel))}
+.flow .node.ok{border-color:var(--ok);
+  background:linear-gradient(160deg,rgba(34,201,138,.12),var(--panel))}
+.flow .arrow{color:var(--txt-faint);font-size:20px;padding:6px 0;text-align:center;line-height:1.3}
+.flow .arrow small{display:block;font-size:11px;color:var(--txt-faint);font-family:var(--mono)}
+
+/* diagram */
+.diagram{background:linear-gradient(160deg,var(--panel-2),var(--code-bg));
+  border:1px solid var(--code-border);border-radius:14px;padding:20px 18px 12px;
+  margin:20px 0;box-shadow:var(--shadow)}
+.diagram svg{display:block;width:100%;height:auto}
+.diagram figcaption{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);
+  color:var(--txt-faint);font-size:12.5px;text-align:center}
+
+/* refs */
+ol.refs{counter-reset:r;list-style:none;padding:0;margin:10px 0 0}
+ol.refs li{counter-increment:r;position:relative;padding:12px 14px 12px 46px;
+  border:1px solid var(--border);border-radius:10px;margin-bottom:10px;
+  background:var(--panel);transition:.18s}
+ol.refs li:hover{border-color:var(--border-2);background:var(--panel-2)}
+ol.refs li::before{content:counter(r);position:absolute;left:12px;top:12px;
+  width:22px;height:22px;display:grid;place-items:center;border-radius:6px;
+  font-family:var(--mono);font-size:12px;color:var(--accent);
+  background:rgba(22,199,193,.12);border:1px solid rgba(22,199,193,.35)}
+ol.refs a{color:var(--accent-2);text-decoration:none;word-break:break-all;
+  font-size:12.5px;font-family:var(--mono)}
+ol.refs a:hover{text-decoration:underline}
+ol.refs .rt{display:block;color:var(--txt);font-weight:600;margin-bottom:3px;font-size:14px}
+
+footer{margin-top:60px;padding:30px 0 10px;border-top:1px solid var(--border)}
+footer h3{font-size:15px;color:var(--txt-faint);letter-spacing:1px;text-transform:uppercase;
+  margin:0 0 14px}
+footer .fnote{margin-top:22px;font-size:12.5px;color:var(--txt-faint)}
+
+/* totop */
+.totop{position:fixed;right:26px;bottom:26px;width:44px;height:44px;border-radius:50%;
+  background:var(--panel);border:1px solid var(--border-2);color:var(--txt);
+  font-size:18px;cursor:pointer;display:grid;place-items:center;opacity:0;
+  pointer-events:none;transition:.2s;box-shadow:var(--shadow);z-index:60}
+.totop.show{opacity:1;pointer-events:auto}
+.totop:hover{border-color:var(--accent);color:var(--accent)}
+
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;opacity:0;
+  pointer-events:none;transition:.2s}
+.scrim.show{opacity:1;pointer-events:auto}
+
+/* responsive */
+@media(max-width:1080px){
+  .sidebar{position:fixed;left:0;top:0;z-index:70;transform:translateX(-100%);
+    transition:transform .25s;box-shadow:var(--shadow)}
+  .sidebar.open{transform:translateX(0)}
+  .mobile-toggle{display:inline-flex}
+  .search{min-width:auto}
+  .cards{grid-template-columns:1fr}
+}
+@media(max-width:820px){
+  .cmp{grid-template-columns:1fr}
+}
+@media(max-width:680px){
+  .content{padding:0 16px}
+  .topbar{padding:12px 16px}
+  .crumb{display:none}
+  .search{max-width:150px}
+  .hero{padding:26px 20px}
+  .hero h2{font-size:28px}
+}
+@media(max-width:640px){
+  table{min-width:0}
+}
+@media(max-width:760px){
+  .totop{right:14px;bottom:14px}
+}
+
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="scrim" id="scrim"></div>
+<div class="wrap">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><span class="logo">i3</span><div>iperf / iperf3<small>완전 정리 가이드</small></div></div>
+    <div class="side-meta">iperf3 3.16+ 기준 · CLI 실전 가이드</div>
+    <div class="toc-title">목차 · Contents</div>
+    <nav class="toc" id="toc">
+      <a href="#iperf2-vs-iperf3"><span class="num">01</span> iperf2 vs iperf3</a>
+      <a href="#install"><span class="num">02</span> 설치</a>
+      <a href="#how-it-works"><span class="num">03</span> 동작 원리</a>
+      <a href="#common-opts"><span class="num">04</span> 공통 옵션</a>
+      <a href="#server-opts"><span class="num">05</span> 서버 전용 옵션</a>
+      <a href="#client-opts"><span class="num">06</span> 클라이언트 전용 옵션</a>
+      <a href="#udp-opts"><span class="num">07</span> UDP 옵션</a>
+      <a href="#examples"><span class="num">08</span> 실전 예제</a>
+      <a href="#interpret"><span class="num">09</span> 결과 해석</a>
+      <a href="#pitfalls"><span class="num">10</span> 함정과 베스트 프랙티스</a>
+      <a href="#errors"><span class="num">11</span> 대표 오류 해결</a>
+      <a href="#procedure"><span class="num">12</span> 권장 측정 절차</a>
+      <a href="#refs" class="ref-link">참고 자료</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <button class="btn mobile-toggle" id="menuBtn" aria-label="menu">☰</button>
+      <div class="crumb">Network Tooling · iperf / iperf3</div>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
+        </svg>
+        <input id="searchInput" type="text" placeholder="문서 내 검색…" />
+      </div>
+      <button class="btn" id="themeBtn" title="테마 전환">🌙 <span id="themeLbl">Dark</span></button>
+    </div>
+
+    <div class="content">
+      <header class="hero">
+        <span class="eyebrow">◆ Network Performance Tooling</span>
+        <h2><span class="grad">iperf</span> / iperf3 완전 정리</h2>
+        <p class="lead">네트워크 성능 측정 도구 사용법 및 실전 예제. iperf2 · iperf3 차이부터 BDP 계산, UDP 튜닝, 결과 진단 패턴, 대표 오류 해결까지 실무 기준으로 정리합니다.</p>
+        <div class="chips">
+          <span class="chip"><span class="dot"></span> TCP / UDP 처리량 측정</span>
+          <span class="chip"><span class="dot"></span> iperf3 3.16+ 멀티스레드</span>
+          <span class="chip"><span class="dot"></span> JSON 자동화 연동</span>
+          <span class="chip"><span class="dot"></span> DSCP / Congestion Control</span>
+        </div>
+      </header>
+
+      <section id="iperf2-vs-iperf3">
+        <h2 class="sec"><span class="idx">01</span> iperf2 vs iperf3</h2>
+        <div class="sec-rule"></div>
+        <p>iperf 계열은 <code>iperf2</code>(<code>iperf</code> 바이너리)와 <code>iperf3</code>(<code>iperf3</code> 바이너리) 두 갈래로 완전히 분리되어 있습니다. 이름만 비슷할 뿐 프로토콜 호환성은 없습니다. 먼저 두 계열의 차이를 명확히 구분합니다.</p>
+
+        <div class="cmp">
+          <div class="side a">
+            <h4>iperf2</h4>
+            <div class="role">// <code>iperf</code> 바이너리</div>
+            <ul>
+              <li>NLANR/UIUC 계열에서 출발한 <span class="k">오래된 코드베이스</span></li>
+              <li>기본 포트 <strong>5001</strong></li>
+              <li>멀티스레드를 오래전부터 지원</li>
+              <li>JSON 출력 <strong>없음</strong></li>
+              <li>역방향/양방향 지원이 버전별로 상이</li>
+              <li>인증 기능 <strong>제한적</strong></li>
+            </ul>
+          </div>
+          <div class="side b">
+            <h4>iperf3</h4>
+            <div class="role">// <code>iperf3</code> 바이너리</div>
+            <ul>
+              <li>ESnet이 <span class="k">전면 재작성</span>한 신규 구현</li>
+              <li>기본 포트 <strong>5201</strong></li>
+              <li>3.15 이하는 사실상 단일 스레드 / <strong>3.16+부터 <code>-P</code> 스트림별 스레드</strong></li>
+              <li>JSON 출력 <code>-J</code> <strong>공식 지원</strong></li>
+              <li>역방향 <code>-R</code>(3.1+), 양방향 <code>--bidir</code>(3.7+)</li>
+              <li>RSA 키 + 사용자 인증 지원</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>항목</th><th>iperf2 (<code>iperf</code>)</th><th>iperf3 (<code>iperf3</code>)</th></tr></thead>
+            <tbody>
+              <tr><td>개발</td><td>NLANR/UIUC 계열</td><td>ESnet 전면 재작성</td></tr>
+              <tr><td>기본 포트</td><td>5001</td><td>5201</td></tr>
+              <tr><td>상호 호환</td><td class="no">불가</td><td class="no">불가</td></tr>
+              <tr><td>멀티스레드</td><td>오래전부터 지원</td><td>3.15 이하 사실상 단일 스레드 / <strong>3.16+ <code>-P</code> 스트림별 스레드</strong></td></tr>
+              <tr><td>JSON 출력</td><td>없음</td><td><code>-J</code> 공식 지원</td></tr>
+              <tr><td>역방향/양방향</td><td>버전별 상이</td><td><code>-R</code>(3.1+), <code>--bidir</code>(3.7+)</td></tr>
+              <tr><td>인증</td><td>제한적</td><td>RSA 키 + 사용자 인증</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout danger">
+          <div class="ico">✗</div>
+          <div class="body">
+            <div class="lbl">가장 흔한 실수</div>
+            <p>iperf2 서버에 iperf3 클라이언트로 붙는 것. 프로토콜이 완전히 달라 <strong>절대 연결되지 않습니다</strong>. 양쪽 모두 같은 계열이어야 합니다.</p>
+          </div>
+        </div>
+
+        <p><strong>3.16 멀티스레드 변경</strong>이 중요한 이유: 이전에는 25/40/100G 환경에서 <code>-P 16</code>을 줘도 CPU 코어 하나가 병목이었습니다. 3.16부터 각 스트림이 별도 스레드로 처리되어 멀티코어를 실제로 활용합니다.</p>
+      </section>
+
+      <section id="install">
+        <h2 class="sec"><span class="idx">02</span> 설치</h2>
+        <div class="sec-rule"></div>
+
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-cmt"># macOS</span>
+<span class="t-kw">brew</span> install <span class="t-kw">iperf3</span>          <span class="t-cmt"># iperf3</span>
+<span class="t-kw">brew</span> install <span class="t-kw">iperf</span>           <span class="t-cmt"># iperf2</span>
+
+<span class="t-cmt"># Ubuntu / Debian</span>
+<span class="t-kw">sudo</span> <span class="t-kw">apt</span> update &amp;&amp; <span class="t-kw">sudo</span> <span class="t-kw">apt</span> install <span class="t-kw">iperf3</span>
+
+<span class="t-cmt"># RHEL / Rocky / Alma</span>
+<span class="t-kw">sudo</span> <span class="t-kw">dnf</span> install <span class="t-kw">iperf3</span>      <span class="t-cmt"># 없으면 sudo dnf install epel-release 먼저</span>
+
+<span class="t-cmt"># 버전 확인 (3.16 이상인지 꼭 확인)</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">--version</span></code></pre>
+        </div>
+
+        <p><strong>Windows</strong>: <a href="https://iperf.fr/en/download/windows/download/windows/iperf-download.php" target="_blank" rel="noopener">iperf.fr Windows 바이너리</a> 또는 <code>choco install iperf3</code> / WSL</p>
+
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">POWERSHELL</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">New-NetFirewallRule</span> <span class="t-attr">-DisplayName</span> <span class="t-str">"iperf3</span> TCP 5201" <span class="t-attr">-Direction</span> Inbound <span class="t-attr">-Protocol</span> TCP <span class="t-attr">-LocalPort</span> <span class="t-num">5201</span> <span class="t-attr">-Action</span> Allow
+<span class="t-kw">New-NetFirewallRule</span> <span class="t-attr">-DisplayName</span> <span class="t-str">"iperf3</span> UDP 5201" <span class="t-attr">-Direction</span> Inbound <span class="t-attr">-Protocol</span> UDP <span class="t-attr">-LocalPort</span> <span class="t-num">5201</span> <span class="t-attr">-Action</span> Allow</code></pre>
+        </div>
+
+        <h4 class="subsub">Docker</h4>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">docker</span> run <span class="t-attr">--rm</span> <span class="t-attr">-it</span> <span class="t-attr">--network</span> host networkstatic/iperf3 <span class="t-attr">-s</span>
+
+<span class="t-cmt"># bridge 사용 시 TCP/UDP 모두 매핑 필요</span>
+<span class="t-kw">docker</span> run <span class="t-attr">--rm</span> <span class="t-attr">-it</span> <span class="t-attr">-p</span> 5201:5201/tcp <span class="t-attr">-p</span> 5201:5201/udp networkstatic/iperf3 <span class="t-attr">-s</span></code></pre>
+        </div>
+      </section>
+
+      <section id="how-it-works">
+        <h2 class="sec"><span class="idx">03</span> 동작 원리</h2>
+        <div class="sec-rule"></div>
+        <p>iperf3 세션은 하나의 TCP 제어 연결과, 실제 측정용 데이터 연결(TCP 또는 UDP)로 구성됩니다. 클라이언트가 먼저 서버의 TCP 5201 제어 포트로 접속해 테스트 파라미터를 협상하고, 이어서 데이터 스트림을 주고받은 뒤, 마지막으로 결과 통계를 교환합니다.</p>
+
+        <figure class="diagram">
+<svg viewBox="0 0 900 380" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>iperf3 클라이언트-서버 제어/데이터/결과 흐름 시퀀스 다이어그램</title>
+  <defs>
+    <marker id="arrow-hw-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#16c7c1"/>
+    </marker>
+    <marker id="arrow-hw-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1ba0e2"/>
+    </marker>
+    <marker id="arrow-hw-violet" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6f6cf6"/>
+    </marker>
+  </defs>
+
+  <!-- lifelines -->
+  <line x1="120" y1="90" x2="120" y2="350" stroke="#2e3c54" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <line x1="780" y1="90" x2="780" y2="350" stroke="#2e3c54" stroke-width="1.5" stroke-dasharray="4 4"/>
+
+  <!-- client node -->
+  <rect x="30" y="20" width="180" height="60" rx="16" fill="#16202f" stroke="#2e3c54" stroke-width="1.5"/>
+  <text x="120" y="45" text-anchor="middle" font-size="15" font-weight="700" fill="#dce3ee" font-family="-apple-system,sans-serif">CLIENT</text>
+  <text x="120" y="65" text-anchor="middle" font-size="11.5" fill="#9fb0c6" font-family="monospace">iperf3 -c SERVER</text>
+
+  <!-- server node -->
+  <rect x="690" y="20" width="180" height="60" rx="16" fill="#16202f" stroke="#2e3c54" stroke-width="1.5"/>
+  <text x="780" y="45" text-anchor="middle" font-size="15" font-weight="700" fill="#dce3ee" font-family="-apple-system,sans-serif">SERVER</text>
+  <text x="780" y="65" text-anchor="middle" font-size="11.5" fill="#9fb0c6" font-family="monospace">iperf3 -s</text>
+
+  <!-- row 1: control connection -->
+  <circle cx="120" cy="140" r="4" fill="#16c7c1"/>
+  <line x1="120" y1="140" x2="780" y2="140" stroke="#16c7c1" stroke-width="2.5" marker-end="url(#arrow-hw-teal)"/>
+  <rect x="325" y="105" width="250" height="22" rx="11" fill="#0b111c" stroke="#16c7c1" stroke-opacity="0.55"/>
+  <text x="450" y="120" text-anchor="middle" font-size="12.5" font-weight="600" fill="#16c7c1" font-family="-apple-system,sans-serif">제어 연결 · TCP 5201</text>
+  <text x="450" y="158" text-anchor="middle" font-size="11" fill="#6c7d96" font-family="-apple-system,sans-serif">테스트 파라미터 협상</text>
+
+  <!-- row 2: data stream -->
+  <circle cx="120" cy="230" r="4" fill="#1ba0e2"/>
+  <line x1="120" y1="230" x2="780" y2="230" stroke="#1ba0e2" stroke-width="2.5" marker-end="url(#arrow-hw-blue)"/>
+  <rect x="325" y="195" width="250" height="22" rx="11" fill="#0b111c" stroke="#1ba0e2" stroke-opacity="0.55"/>
+  <text x="450" y="210" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1ba0e2" font-family="-apple-system,sans-serif">데이터 스트림 · TCP / UDP</text>
+  <text x="450" y="248" text-anchor="middle" font-size="11" fill="#6c7d96" font-family="-apple-system,sans-serif">실제 측정 트래픽 전송</text>
+
+  <!-- row 3: result stats (server -> client) -->
+  <circle cx="780" cy="320" r="4" fill="#6f6cf6"/>
+  <line x1="780" y1="320" x2="120" y2="320" stroke="#6f6cf6" stroke-width="2.5" marker-end="url(#arrow-hw-violet)"/>
+  <rect x="325" y="285" width="250" height="22" rx="11" fill="#0b111c" stroke="#6f6cf6" stroke-opacity="0.55"/>
+  <text x="450" y="300" text-anchor="middle" font-size="12.5" font-weight="600" fill="#6f6cf6" font-family="-apple-system,sans-serif">결과 통계 교환</text>
+  <text x="450" y="338" text-anchor="middle" font-size="11" fill="#6c7d96" font-family="-apple-system,sans-serif">양측 측정치 최종 교환</text>
+</svg>
+
+          <figcaption>iperf3 클라이언트 ↔ 서버 : 제어 연결 → 데이터 스트림 → 결과 통계 교환 3단계 흐름</figcaption>
+        </figure>
+
+        <div class="callout note">
+          <div class="ico">i</div>
+          <div class="body">
+            <div class="lbl">핵심</div>
+            <p><strong>UDP 테스트에도 제어용 TCP 5201 연결이 필요</strong>합니다. 방화벽에 TCP와 UDP를 모두 열어야 합니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="common-opts">
+        <h2 class="sec"><span class="idx">04</span> 공통 옵션</h2>
+        <div class="sec-rule"></div>
+        <p>서버/클라이언트 모드 상관없이 공통으로 사용하는 옵션입니다.</p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>옵션</th><th>설명</th></tr></thead>
+            <tbody>
+              <tr><td><code>-s</code> / <code>-c host</code></td><td>서버 모드 / 클라이언트 모드</td></tr>
+              <tr><td><code>-p port</code></td><td>포트 지정 (기본 5201)</td></tr>
+              <tr><td><code>-f k|m|g|K|M|G</code></td><td>단위. <strong>소문자=bit, 대문자=byte</strong></td></tr>
+              <tr><td><code>-i sec</code></td><td>중간 결과 출력 간격</td></tr>
+              <tr><td><code>-F file</code></td><td>지정 파일을 전송 데이터로 사용</td></tr>
+              <tr><td><code>-A cpu[,cpu]</code></td><td>CPU 어피니티 고정</td></tr>
+              <tr><td><code>-B addr</code></td><td>특정 로컬 주소/인터페이스 바인드</td></tr>
+              <tr><td><code>-V</code></td><td>상세 출력</td></tr>
+              <tr><td><code>-J</code></td><td>JSON 출력</td></tr>
+              <tr><td><code>--logfile file</code></td><td>출력을 파일로</td></tr>
+              <tr><td><code>-d</code></td><td>디버그</td></tr>
+              <tr><td><code>-1</code></td><td>서버가 1회 테스트 후 종료</td></tr>
+              <tr><td><code>--forceflush</code></td><td>출력 버퍼 강제 flush (파이프 처리 시 유용)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="server-opts">
+        <h2 class="sec"><span class="idx">05</span> 서버 전용 옵션</h2>
+        <div class="sec-rule"></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>옵션</th><th>설명</th></tr></thead>
+            <tbody>
+              <tr><td><code>-D</code></td><td>데몬 모드</td></tr>
+              <tr><td><code>-I file</code></td><td>PID 파일 기록</td></tr>
+              <tr><td><code>--rsa-private-key-path</code></td><td>RSA 개인키 (인증용)</td></tr>
+              <tr><td><code>--authorized-users-path</code></td><td>인증 사용자 목록</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="client-opts">
+        <h2 class="sec"><span class="idx">06</span> 클라이언트 전용 옵션</h2>
+        <div class="sec-rule"></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>옵션</th><th>설명</th></tr></thead>
+            <tbody>
+              <tr><td><code>-t sec</code></td><td>테스트 시간 (기본 10초)</td></tr>
+              <tr><td><code>-n bytes</code></td><td>총 전송량 기준 종료</td></tr>
+              <tr><td><code>-k blocks</code></td><td>블록 수 기준 종료</td></tr>
+              <tr><td><code>-l len</code></td><td>버퍼/데이터그램 크기</td></tr>
+              <tr><td><code>-P n</code></td><td>병렬 스트림 수</td></tr>
+              <tr><td><code>-R</code></td><td>역방향 (서버→클라이언트)</td></tr>
+              <tr><td><code>--bidir</code></td><td>양방향 동시</td></tr>
+              <tr><td><code>-w size</code></td><td>TCP 윈도우/소켓 버퍼</td></tr>
+              <tr><td><code>-M size</code></td><td>TCP MSS</td></tr>
+              <tr><td><code>-N</code></td><td>TCP_NODELAY (Nagle 끄기)</td></tr>
+              <tr><td><code>-4</code> / <code>-6</code></td><td>IPv4 / IPv6 강제</td></tr>
+              <tr><td><code>-S value</code></td><td>IP ToS 바이트 값</td></tr>
+              <tr><td><code>-Z</code></td><td>zero-copy 송신 (CPU 절감)</td></tr>
+              <tr><td><code>-O sec</code></td><td>초기 N초를 결과에서 제외</td></tr>
+              <tr><td><code>-T title</code></td><td>출력 제목</td></tr>
+              <tr><td><code>-C algo</code></td><td>congestion control 지정</td></tr>
+              <tr><td><code>--get-server-output</code></td><td>서버 측 결과도 함께 출력</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="udp-opts">
+        <h2 class="sec"><span class="idx">07</span> UDP 옵션</h2>
+        <div class="sec-rule"></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>옵션</th><th>설명</th></tr></thead>
+            <tbody>
+              <tr><td><code>-u</code></td><td>UDP 모드</td></tr>
+              <tr><td><code>-b rate</code></td><td>목표 비트레이트 (<strong>UDP 기본값 1Mbps — 반드시 지정할 것</strong>)</td></tr>
+              <tr><td><code>--fq-rate rate</code></td><td>Linux FQ 기반 pacing</td></tr>
+              <tr><td><code>--pacing-timer us</code></td><td>애플리케이션 pacing 주기</td></tr>
+              <tr><td><code>--udp-counters-64bit</code></td><td>64비트 카운터</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout warn">
+          <div class="ico">⚠</div>
+          <div class="body">
+            <div class="lbl">주의 1</div>
+            <p><code>-b</code>는 "최대 속도 자동 탐색"이 아닙니다. 지정한 속도로 밀어넣을 뿐입니다. 링크 용량보다 높게 주면 손실이 나는 게 정상입니다.</p>
+          </div>
+        </div>
+        <div class="callout warn">
+          <div class="ico">⚠</div>
+          <div class="body">
+            <div class="lbl">주의 2</div>
+            <p><code>-P n</code>과 <code>-b</code>를 함께 쓰면 비트레이트가 <strong>스트림당</strong> 적용됩니다. <code>-P 4 -b 100M</code> = 총 400Mbps.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="examples">
+        <h2 class="sec"><span class="idx">08</span> 실전 예제</h2>
+        <div class="sec-rule"></div>
+        <p>서버는 먼저 <code>iperf3 -s</code> 실행. 아래는 클라이언트 명령입니다.</p>
+
+        <h3 class="sub">8.1 기본 TCP</h3>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span>                    <span class="t-cmt"># 기본 10초 측정</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-t</span> <span class="t-num">30</span> <span class="t-attr">-i</span> <span class="t-num">1</span>         <span class="t-cmt"># 30초, 1초 간격 출력</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-f</span> m               <span class="t-cmt"># Mbit/s 단위 고정</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-V</span>                 <span class="t-cmt"># 소켓/주소 상세 정보</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-n</span> <span class="t-num">1G</span>              <span class="t-cmt"># 1GiB 전송 후 종료</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-F</span> <span class="t-str">./testfile</span>      <span class="t-cmt"># 특정 파일로 전송</span></code></pre>
+        </div>
+
+        <h3 class="sub">8.2 병렬 / 방향</h3>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-P</span> <span class="t-num">4</span> <span class="t-attr">-t</span> <span class="t-num">30</span>          <span class="t-cmt"># 4개 병렬 스트림</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-P</span> <span class="t-num">16</span> <span class="t-attr">-t</span> <span class="t-num">30</span>         <span class="t-cmt"># 고속망 스케일 테스트</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-R</span>                  <span class="t-cmt"># 역방향 (다운로드 측정)</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">--bidir</span> <span class="t-attr">-t</span> <span class="t-num">30</span>       <span class="t-cmt"># 양방향 동시</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">--get-server-output</span> <span class="t-cmt"># 서버 측 통계까지 확인</span></code></pre>
+        </div>
+
+        <h3 class="sub">8.3 UDP</h3>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-u</span> <span class="t-attr">-b</span> <span class="t-num">100M</span> <span class="t-attr">-t</span> <span class="t-num">30</span>       <span class="t-cmt"># 100Mbps UDP</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-u</span> <span class="t-attr">-b</span> <span class="t-num">1G</span> <span class="t-attr">-t</span> <span class="t-num">30</span> <span class="t-attr">-i</span> <span class="t-num">1</span>    <span class="t-cmt"># 1Gbps, 초당 지터/손실 추적</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-u</span> <span class="t-attr">-b</span> <span class="t-num">500M</span> <span class="t-attr">-l</span> <span class="t-num">1200</span>     <span class="t-cmt"># 데이터그램 1200B (MTU 여유)</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-u</span> <span class="t-attr">-b</span> <span class="t-num">1G</span> <span class="t-attr">--fq-rate</span> <span class="t-num">1G</span>  <span class="t-cmt"># FQ pacing으로 버스트 완화</span></code></pre>
+        </div>
+        <p>손실이 시작되는 지점 탐색:</p>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code>for r in <span class="t-num">100M</span> <span class="t-num">300M</span> <span class="t-num">500M</span> <span class="t-num">800M</span> 1G; do
+  echo <span class="t-str">"===</span> $r ==="
+  <span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-u</span> <span class="t-attr">-b</span> $r <span class="t-attr">-t</span> <span class="t-num">10</span> | tail <span class="t-attr">-4</span>
+done</code></pre>
+        </div>
+
+        <h3 class="sub">8.4 MTU / MSS / 윈도우</h3>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-M</span> <span class="t-num">1460</span>            <span class="t-cmt"># 표준 Ethernet MSS</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-M</span> <span class="t-num">1200</span>            <span class="t-cmt"># VPN/터널 환경 가정</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-N</span>                 <span class="t-cmt"># Nagle 비활성화</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-w</span> <span class="t-num">4M</span>              <span class="t-cmt"># 윈도우 4MiB</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-w</span> <span class="t-num">32M</span> <span class="t-attr">-t</span> <span class="t-num">30</span>       <span class="t-cmt"># 장거리 고대역 경로</span></code></pre>
+        </div>
+
+        <div class="term">
+          <div class="t">BDP 계산 <span class="pill anchor">윈도우 크기 결정 기준</span></div>
+          <div class="d">Bandwidth-Delay Product. 이 값보다 TCP 윈도우가 작으면 회선 대역폭을 다 채울 수 없습니다.</div>
+          <div class="formula">BDP(bytes) = <b>대역폭(bps)</b> <span class="op">×</span> <b>RTT(sec)</b> <span class="op">/</span> 8</div>
+          <div class="d">예) 10Gbps, RTT 20ms<br>
+          10,000,000,000 × 0.020 / 8 = 25,000,000 B ≈ 24 MiB</div>
+        </div>
+        <p>윈도우가 BDP보다 작으면 단일 TCP 흐름은 절대 링크를 채울 수 없습니다. <code>-w</code>를 늘리거나 <code>-P</code>로 스트림을 늘려야 합니다.</p>
+
+        <h3 class="sub">8.5 JSON / 자동화</h3>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-J</span> &gt; result.json
+
+<span class="t-cmt"># 평균 수신 bitrate</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-J</span> | <span class="t-kw">jq</span> <span class="t-str">'.end.sum_received.bits_per_second'</span>
+
+<span class="t-cmt"># 구간별 bitrate</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-J</span> | <span class="t-kw">jq</span> <span class="t-str">'.intervals[].sum.bits_per_second'</span>
+
+<span class="t-cmt"># TCP 재전송 수</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-J</span> | <span class="t-kw">jq</span> <span class="t-str">'.end.sum_sent.retransmits'</span>
+
+<span class="t-cmt"># UDP 손실률</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-u</span> <span class="t-attr">-b</span> <span class="t-num">500M</span> <span class="t-attr">-J</span> | <span class="t-kw">jq</span> <span class="t-str">'.end.sum.lost_percent'</span>
+
+<span class="t-cmt"># Mbps로 보기 좋게</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-J</span> | <span class="t-kw">jq</span> <span class="t-str">'.end.sum_received.bits_per_second/1e6</span> | round'</code></pre>
+        </div>
+
+        <h3 class="sub">8.6 서버 운용</h3>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-s</span> <span class="t-attr">-D</span>                            <span class="t-cmt"># 데몬 모드</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-s</span> <span class="t-attr">-D</span> <span class="t-attr">-I</span> <span class="t-str">/run/iperf3.pid</span>         <span class="t-cmt"># PID 파일</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-s</span> <span class="t-attr">-p</span> <span class="t-num">5202</span>                       <span class="t-cmt"># 다른 포트</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-s</span> <span class="t-attr">-1</span>                            <span class="t-cmt"># 1회만 처리 후 종료</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-s</span> <span class="t-attr">-B</span> <span class="t-num">10.0.0.5</span>                   <span class="t-cmt"># 특정 인터페이스만 수신</span>
+
+<span class="t-cmt"># 동시 다중 측정 → 포트별 인스턴스</span>
+for p in <span class="t-num">5201</span> <span class="t-num">5202</span> 5203; do <span class="t-kw">iperf3</span> <span class="t-attr">-s</span> <span class="t-attr">-p</span> $p <span class="t-attr">-D;</span> done</code></pre>
+        </div>
+
+        <h3 class="sub">8.7 IPv6</h3>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-s</span> <span class="t-attr">-6</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-6</span> <span class="t-attr">-c</span> <span class="t-num">2001:db8::10</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-4</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span>                 <span class="t-cmt"># IPv4 강제</span></code></pre>
+        </div>
+
+        <h3 class="sub">8.8 DSCP / QoS</h3>
+        <div class="callout warn">
+          <div class="ico">⚠</div>
+          <div class="body">
+            <div class="lbl">주의</div>
+            <p><code>-S</code>는 DSCP 값이 아니라 <strong>ToS 바이트 전체 값</strong>입니다. DSCP는 상위 6비트이므로 <code>DSCP × 4</code>를 넣어야 합니다.</p>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>DSCP</th><th>이름</th><th><code>-S</code> 값 (10진)</th><th>16진</th></tr></thead>
+            <tbody>
+              <tr><td>46</td><td>EF</td><td><strong>184</strong></td><td>0xB8</td></tr>
+              <tr><td>34</td><td>AF41</td><td><strong>136</strong></td><td>0x88</td></tr>
+              <tr><td>26</td><td>AF31</td><td><strong>104</strong></td><td>0x68</td></tr>
+              <tr><td>0</td><td>BE</td><td>0</td><td>0x00</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-S</span> <span class="t-num">184</span>             <span class="t-cmt"># DSCP EF (46)</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-S</span> <span class="t-num">0xB8</span>            <span class="t-cmt"># 동일 (16진 표기)</span>
+
+<span class="t-cmt"># 최신 버전은 --dscp 지원 여부 확인</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">--help</span> | grep <span class="t-attr">-i</span> dscp
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">--dscp</span> <span class="t-num">46</span>          <span class="t-cmt"># 지원 시 이게 직관적</span></code></pre>
+        </div>
+        <p>수신 측에서 실제 마킹 보존 여부를 함께 캡처해야 합니다:</p>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">sudo</span> <span class="t-kw">tcpdump</span> <span class="t-attr">-i</span> eth0 <span class="t-attr">-v</span> <span class="t-str">'tcp</span> port 5201' | grep <span class="t-attr">-i</span> tos</code></pre>
+        </div>
+
+        <h3 class="sub">8.9 Congestion Control 비교</h3>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">sysctl</span> <span class="t-str">net.ipv4.tcp_available_congestion_control</span>   <span class="t-cmt"># 사용 가능 목록 확인</span>
+
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-C</span> cubic <span class="t-attr">-t</span> <span class="t-num">30</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> <span class="t-num">192.0.2.10</span> <span class="t-attr">-C</span> bbr   <span class="t-attr">-t</span> <span class="t-num">30</span>
+
+<span class="t-cmt"># BBR 모듈이 없으면 로드</span>
+<span class="t-kw">sudo</span> <span class="t-kw">modprobe</span> tcp_bbr</code></pre>
+        </div>
+        <p>고지연·저손실 경로에서는 BBR이, 저지연 데이터센터에서는 CUBIC이 유리한 경향이 있습니다.</p>
+
+        <h3 class="sub">8.10 방화벽</h3>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-cmt"># firewalld</span>
+<span class="t-kw">sudo</span> <span class="t-kw">firewall-cmd</span> <span class="t-attr">--permanent</span> <span class="t-attr">--add-port=5201/tcp</span>
+<span class="t-kw">sudo</span> <span class="t-kw">firewall-cmd</span> <span class="t-attr">--permanent</span> <span class="t-attr">--add-port=5201/udp</span>
+<span class="t-kw">sudo</span> <span class="t-kw">firewall-cmd</span> <span class="t-attr">--reload</span>
+
+<span class="t-cmt"># ufw</span>
+<span class="t-kw">sudo</span> <span class="t-kw">ufw</span> allow 5201/tcp &amp;&amp; <span class="t-kw">sudo</span> <span class="t-kw">ufw</span> allow 5201/udp
+
+<span class="t-cmt"># 도달성 확인</span>
+<span class="t-kw">nc</span> <span class="t-attr">-vz</span> <span class="t-num">192.0.2.10</span> <span class="t-num">5201</span></code></pre>
+        </div>
+      </section>
+
+      <section id="interpret">
+        <h2 class="sec"><span class="idx">09</span> 결과 해석</h2>
+        <div class="sec-rule"></div>
+
+        <h3 class="sub">9.1 TCP</h3>
+        <pre class="plain">[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]  0.00-1.00  sec   118 MBytes   986 Mbits/sec    0    412 KBytes
+[  5]  0.00-10.00 sec  1.10 GBytes   945 Mbits/sec   12</pre>
+
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>필드</th><th>의미</th><th>판단 기준</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Transfer</strong></td><td>구간 전송량</td><td>—</td></tr>
+              <tr><td><strong>Bitrate</strong></td><td><code>Transfer × 8 / 시간</code>. <strong>애플리케이션 계층</strong> 속도</td><td>1G 링크에서 940~950Mbps면 정상 (헤더 오버헤드)</td></tr>
+              <tr><td><strong>Retr</strong></td><td>TCP 재전송 세그먼트 수</td><td>0에 가까워야 정상. 많으면 손실/혼잡/NIC 문제</td></tr>
+              <tr><td><strong>Cwnd</strong></td><td>congestion window</td><td>작은데 늘지 않으면 손실 또는 윈도우 제한</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4 class="subsub">진단 패턴</h4>
+        <div class="flow">
+          <div class="node hot"><div class="nt">Cwnd 작음 + Retr 많음</div><div class="nd">추정 원인: 경로 패킷 손실 / 혼잡</div></div>
+          <div class="arrow">↓</div>
+          <div class="node hot"><div class="nt">Cwnd 큼 + Bitrate 낮음</div><div class="nd">추정 원인: 수신 측 CPU, 버퍼, 애플리케이션 병목</div></div>
+          <div class="arrow">↓</div>
+          <div class="node hot"><div class="nt">Retr 0 + Bitrate 낮음 + RTT 높음</div><div class="nd">추정 원인: 윈도우 부족 (BDP 대비 <code>-w</code> 상향 필요)</div></div>
+        </div>
+
+        <h3 class="sub">9.2 UDP</h3>
+        <pre class="plain">[  5]  0.00-10.00 sec  119 MBytes  100 Mbits/sec  0.123 ms  12/85000 (0.014%)
+                                                   ^Jitter   ^Lost/Total (손실률)</pre>
+
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>필드</th><th>의미</th><th>기준</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Jitter</strong></td><td>도착 간격 변동</td><td>VoIP 기준 30ms 이하 권장</td></tr>
+              <tr><td><strong>Lost/Total</strong></td><td>유실/전체 데이터그램</td><td>VoIP·영상 1% 이하</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>UDP는 재전송이 없으므로 손실 = 실제 데이터 유실입니다. 단, 손실률만 보지 말고 <strong>지터를 반드시 함께</strong> 확인하세요. 손실 0%여도 지터가 크면 실시간 트래픽은 품질이 나쁩니다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2 class="sec"><span class="idx">10</span> 함정과 베스트 프랙티스</h2>
+        <div class="sec-rule"></div>
+
+        <div class="cards">
+          <div class="card">
+            <h4><span class="n">1</span> CPU가 병목인지 먼저 의심</h4>
+            <p>10G 이상, 작은 패킷, 고속 UDP, VM/컨테이너 환경에서는 iperf3 자체가 병목입니다.</p>
+            <div class="code">
+              <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+              <pre><code><span class="t-kw">mpstat</span> <span class="t-attr">-P</span> ALL <span class="t-num">1</span>        <span class="t-cmt"># 한 코어가 100%면 네트워크가 아니라 iperf3 문제</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-Z</span>    <span class="t-cmt"># zero-copy로 CPU 절감</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-A</span> <span class="t-num">2</span>  <span class="t-cmt"># 특정 코어 고정 (인터럽트 코어와 분리)</span></code></pre>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4><span class="n">2</span> 단일 스트림의 한계</h4>
+            <p>높은 RTT, 작은 윈도우, congestion control, ECMP 해시 때문에 단일 TCP는 링크를 못 채웁니다. 반드시 비교 측정하세요.</p>
+            <div class="code">
+              <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+              <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-t</span> <span class="t-num">30</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-P</span> <span class="t-num">4</span> <span class="t-attr">-t</span> <span class="t-num">30</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-P</span> <span class="t-num">8</span> <span class="t-attr">-t</span> <span class="t-num">30</span></code></pre>
+            </div>
+            <p><code>-P</code>는 무작정 늘리면 컨텍스트 스위칭 오버헤드로 오히려 나빠집니다. 보통 4~8에서 포화됩니다.</p>
+          </div>
+
+          <div class="card">
+            <h4><span class="n">3</span> 측정 시간</h4>
+            <p>최소 10초, 운영 검증은 30초 이상. TCP slow start를 빼려면 <code>-O 5</code>. 단, 초기 응답 성능을 보려는 목적이면 <code>-O</code>를 쓰면 안 됩니다.</p>
+          </div>
+
+          <div class="card">
+            <h4><span class="n">4</span> 무선 환경</h4>
+            <p>RSSI, 채널 폭, MCS, 간섭, 절전 모드에 크게 좌우됩니다. TCP bitrate 하나로 유선과 비교하지 말고 UDP 지터·손실을 함께 측정하세요.</p>
+          </div>
+
+          <div class="card">
+            <h4><span class="n">5</span> 클라우드 / 컨테이너</h4>
+            <p>Security Group, NACL, 호스트 방화벽, NetworkPolicy, Docker 포트 매핑, NAT를 모두 확인해야 합니다.</p>
+          </div>
+
+          <div class="card">
+            <h4><span class="n">6</span> 공개 서버</h4>
+            <p><a href="https://iperf.fr/iperf-servers.php" target="_blank" rel="noopener">iperf.fr 서버 목록</a>이 있지만 혼잡·rate limit·정책 위반 위험이 있습니다. 운영 측정은 직접 관리하는 서버로 하세요. 특히 공개 서버에 고속 UDP를 쏘면 서비스 방해가 됩니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="errors">
+        <h2 class="sec"><span class="idx">11</span> 대표 오류 해결</h2>
+        <div class="sec-rule"></div>
+
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>에러</th><th>원인</th><th>해결</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><code>unable to connect to server</code></td>
+                <td>서버 미실행, 포트/IP 오류, 방화벽, IPv4/6 불일치, <strong>iperf2↔iperf3 혼용</strong></td>
+                <td><code>nc -vz IP 5201</code>, <code>iperf3 --version</code> 양쪽 확인, <code>-4</code>/<code>-6</code> 명시</td>
+              </tr>
+              <tr>
+                <td><code>control socket has closed unexpectedly</code></td>
+                <td>서버 종료, 버전 불일치, 중간 방화벽 세션 끊김, 리소스 부족</td>
+                <td>옵션 없이 기본 테스트로 축소 후 하나씩 추가하며 원인 격리</td>
+              </tr>
+              <tr>
+                <td><code>the server is busy running a test</code></td>
+                <td>서버가 다른 테스트 처리 중 / 이전 세션 미정리</td>
+                <td>대기 후 재시도, <code>ps aux | grep iperf3</code>, 포트별 인스턴스 분리</td>
+              </tr>
+              <tr>
+                <td><code>unable to set TCP_CONGESTION</code></td>
+                <td>해당 알고리즘 모듈 없음</td>
+                <td><code>sysctl net.ipv4.tcp_available_congestion_control</code> 확인, <code>modprobe tcp_bbr</code></td>
+              </tr>
+              <tr>
+                <td><code>unable to set socket buffer size</code></td>
+                <td>OS 최대 버퍼 제한</td>
+                <td><code>sysctl net.core.rmem_max wmem_max</code> 확인 후 상향 또는 <code>-w</code> 축소</td>
+              </tr>
+              <tr>
+                <td>UDP 손실률 과다</td>
+                <td>과부하, 방화벽, MTU 초과, 수신 CPU, 버퍼 부족</td>
+                <td><code>-b</code> 낮춰 재측정, <code>-l 1200</code>, <code>net.core.rmem_max</code> 상향</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flow">
+          <div class="node"><div class="nt">에러 발생</div><div class="nd">연결 실패 / 소켓 종료 / 손실률 과다 중 하나로 분류</div></div>
+          <div class="arrow">↓<small>버전 · 포트 · 프로토콜 교차 확인</small></div>
+          <div class="node hot"><div class="nt">근본 원인 후보 좁히기</div><div class="nd">iperf2/3 혼용, 방화벽 미개방, 버퍼/모듈 부족, 리소스 소진</div></div>
+          <div class="arrow">↓<small>단계적 축소 재현</small></div>
+          <div class="node ok"><div class="nt">최소 옵션으로 재현 후 원인 확정</div><div class="nd">옵션을 하나씩 추가하며 재현 조건 격리 → 해결책 적용</div></div>
+        </div>
+
+        <p>소켓 버퍼 상향 (고속 환경 필수 튜닝):</p>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">sudo</span> <span class="t-kw">sysctl</span> <span class="t-attr">-w</span> <span class="t-str">net.core.rmem_max=268435456</span>
+<span class="t-kw">sudo</span> <span class="t-kw">sysctl</span> <span class="t-attr">-w</span> <span class="t-str">net.core.wmem_max=268435456</span>
+<span class="t-kw">sudo</span> <span class="t-kw">sysctl</span> <span class="t-attr">-w</span> <span class="t-str">net.ipv4.tcp_rmem="4096</span> <span class="t-num">87380</span> 268435456"
+<span class="t-kw">sudo</span> <span class="t-kw">sysctl</span> <span class="t-attr">-w</span> <span class="t-str">net.ipv4.tcp_wmem="4096</span> <span class="t-num">65536</span> 268435456"</code></pre>
+        </div>
+      </section>
+
+      <section id="procedure">
+        <h2 class="sec"><span class="idx">12</span> 권장 측정 절차</h2>
+        <div class="sec-rule"></div>
+
+        <h3 class="sub">TCP 경로 검증</h3>
+        <ol class="steps">
+          <li>
+            <div class="stt">베이스라인 측정</div>
+            <div class="loc">옵션 없이 기본 10초 테스트</div>
+            <div class="code">
+              <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+              <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-t</span> <span class="t-num">10</span></code></pre>
+            </div>
+          </li>
+          <li>
+            <div class="stt">안정성 확인</div>
+            <div class="loc">30초, 1초 간격 중간 결과로 변동 관찰</div>
+            <div class="code">
+              <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+              <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-t</span> <span class="t-num">30</span> <span class="t-attr">-i</span> <span class="t-num">1</span></code></pre>
+            </div>
+          </li>
+          <li>
+            <div class="stt">병렬 스케일 테스트</div>
+            <div class="loc">4개 병렬 스트림으로 단일 흐름 한계 확인</div>
+            <div class="code">
+              <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+              <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-P</span> <span class="t-num">4</span> <span class="t-attr">-t</span> <span class="t-num">30</span></code></pre>
+            </div>
+          </li>
+          <li>
+            <div class="stt">역방향 측정</div>
+            <div class="loc">서버 → 클라이언트 방향 (다운로드 경로)</div>
+            <div class="code">
+              <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+              <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-R</span> <span class="t-attr">-t</span> <span class="t-num">30</span></code></pre>
+            </div>
+          </li>
+          <li>
+            <div class="stt">양방향 동시 측정</div>
+            <div class="loc">업/다운 동시 부하에서의 실제 처리량 확인</div>
+            <div class="code">
+              <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+              <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">--bidir</span> <span class="t-attr">-t</span> <span class="t-num">30</span></code></pre>
+            </div>
+          </li>
+          <li>
+            <div class="stt">최종 기록</div>
+            <div class="loc">slow start 제외, JSON으로 결과 보존</div>
+            <div class="code">
+              <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+              <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-P</span> <span class="t-num">4</span> <span class="t-attr">-t</span> <span class="t-num">30</span> <span class="t-attr">-O</span> <span class="t-num">5</span> <span class="t-attr">-J</span> &gt; tcp.json</code></pre>
+            </div>
+          </li>
+        </ol>
+
+        <h3 class="sub">UDP 검증</h3>
+        <div class="code">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">BASH</span><button class="copy">복사</button></div>
+          <pre><code><span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-u</span> <span class="t-attr">-b</span> <span class="t-num">100M</span> <span class="t-attr">-t</span> <span class="t-num">30</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-u</span> <span class="t-attr">-b</span> <span class="t-num">500M</span> <span class="t-attr">-t</span> <span class="t-num">30</span>
+<span class="t-kw">iperf3</span> <span class="t-attr">-c</span> SERVER <span class="t-attr">-u</span> <span class="t-attr">-b</span> <span class="t-num">1G</span>   <span class="t-attr">-t</span> <span class="t-num">30</span></code></pre>
+        </div>
+
+        <div class="term">
+          <div class="t">결과 기록 시 함께 남겨야 할 항목</div>
+          <div class="d">iperf3 버전, 방향, 병렬 스트림 수, <code>-w</code>/<code>-M</code> 설정, RTT, CPU 사용률, TCP 재전송 수, UDP 손실률·지터, 링크 속도, MTU.</div>
+        </div>
+        <p>이 맥락 없는 bitrate 숫자 하나는 재현도 비교도 불가능합니다.</p>
+      </section>
+
+      <footer id="refs">
+        <h3>참고 자료</h3>
+        <ol class="refs">
+          <li><span class="rt">ESnet iperf3 공식 사이트</span><a href="https://software.es.net/iperf/" target="_blank" rel="noopener">https://software.es.net/iperf/</a></li>
+          <li><span class="rt">ESnet iperf3 GitHub</span><a href="https://github.com/esnet/iperf" target="_blank" rel="noopener">https://github.com/esnet/iperf</a></li>
+          <li><span class="rt">iperf3 옵션 문서</span><a href="https://software.es.net/iperf/invoking.html" target="_blank" rel="noopener">https://software.es.net/iperf/invoking.html</a></li>
+          <li><span class="rt">iperf3 FAQ</span><a href="https://software.es.net/iperf/faq.html" target="_blank" rel="noopener">https://software.es.net/iperf/faq.html</a></li>
+          <li><span class="rt">iperf3 man page</span><a href="https://github.com/esnet/iperf/blob/master/src/iperf3.1" target="_blank" rel="noopener">https://github.com/esnet/iperf/blob/master/src/iperf3.1</a></li>
+          <li><span class="rt">iperf3 3.16 릴리스 노트</span><a href="https://github.com/esnet/iperf/releases/tag/3.16" target="_blank" rel="noopener">https://github.com/esnet/iperf/releases/tag/3.16</a></li>
+          <li><span class="rt">iperf3 멀티스레드 PR</span><a href="https://github.com/esnet/iperf/pull/1591" target="_blank" rel="noopener">https://github.com/esnet/iperf/pull/1591</a></li>
+          <li><span class="rt">iperf.fr 문서</span><a href="https://iperf.fr/iperf-doc.php" target="_blank" rel="noopener">https://iperf.fr/iperf-doc.php</a></li>
+          <li><span class="rt">iperf.fr Windows 바이너리</span><a href="https://iperf.fr/en/download/windows/download/windows/iperf-download.php" target="_blank" rel="noopener">https://iperf.fr/en/download/windows/download/windows/iperf-download.php</a></li>
+        </ol>
+        <p class="fnote">출처: <a href="https://software.es.net/iperf/" target="_blank" rel="noopener">software.es.net/iperf</a> · <a href="https://github.com/esnet/iperf" target="_blank" rel="noopener">esnet/iperf GitHub</a> · <a href="https://software.es.net/iperf/invoking.html" target="_blank" rel="noopener">invoking.html</a> · <a href="https://software.es.net/iperf/faq.html" target="_blank" rel="noopener">FAQ</a> · <a href="https://iperf.fr/" target="_blank" rel="noopener">iperf.fr</a></p>
+      </footer>
+    </div>
+  </main>
+</div>
+
+<button class="totop" id="toTop" title="맨 위로" aria-label="맨 위로">↑</button>
+
+<script>
+// Progress bar
+const pb=document.getElementById('progress');
+const onScroll=()=>{
+  const h=document.documentElement;
+  const sc=h.scrollTop, max=h.scrollHeight-h.clientHeight;
+  pb.style.width=(max>0?(sc/max*100):0)+'%';
+};
+document.addEventListener('scroll',onScroll,{passive:true});
+onScroll();
+
+// Scroll spy (position calc, B 방식)
+const secIds=[...document.querySelectorAll('main [id]')].map(el=>el.id);
+const tocLinks=[...document.querySelectorAll('nav.toc a[href^="#"]')];
+function updateSpy(){
+  let cur=secIds[0];
+  for(const id of secIds){
+    const el=document.getElementById(id);
+    if(el && el.getBoundingClientRect().top<=120) cur=id;
+  }
+  tocLinks.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+cur));
+}
+document.addEventListener('scroll',updateSpy,{passive:true});
+updateSpy();
+
+// Theme toggle + localStorage
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  document.getElementById('themeLbl').textContent = t==='light'?'Light':'Dark';
+  document.getElementById('themeBtn').firstChild.nodeValue = t==='light'?'☀️ ':'🌙 ';
+  localStorage.setItem('iperf-guide-theme',t);
+}
+document.getElementById('themeBtn').addEventListener('click',()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  setTheme(cur==='light'?'dark':'light');
+});
+setTheme(localStorage.getItem('iperf-guide-theme')||'dark');
+
+// Copy to clipboard
+function bindCopy(){
+  document.querySelectorAll('.code .copy').forEach(b=>{
+    if(b.dataset.bound)return; b.dataset.bound=1;
+    b.onclick=()=>{
+      const pre=b.closest('.code').querySelector('pre');
+      navigator.clipboard.writeText(pre.innerText).then(()=>{
+        const t=b.textContent;
+        b.textContent='✓ 복사됨'; b.classList.add('done');
+        setTimeout(()=>{b.textContent=t;b.classList.remove('done')},1400);
+      });
+    };
+  });
+}
+bindCopy();
+
+// 섹션 검색 필터
+const si=document.getElementById('searchInput');
+if(si){
+  si.addEventListener('input',()=>{
+    const q=si.value.trim().toLowerCase();
+    document.querySelectorAll('main section').forEach(sec=>{
+      if(!q){sec.style.display='';return;}
+      sec.style.display=sec.innerText.toLowerCase().includes(q)?'':'none';
+    });
+  });
+}
+
+// 모바일 사이드바
+const sb=document.getElementById('sidebar'), sc=document.getElementById('scrim');
+document.getElementById('menuBtn').onclick=()=>{
+  sb.classList.add('open'); sc.classList.add('show');
+};
+function closeM(){ sb.classList.remove('open'); sc.classList.remove('show'); }
+sc.onclick=closeM;
+document.querySelectorAll('.toc a').forEach(a=>a.addEventListener('click',closeM));
+
+// Back to top
+const toTop=document.getElementById('toTop');
+document.addEventListener('scroll',()=>{
+  toTop.classList.toggle('show',window.scrollY>500);
+},{passive:true});
+toTop.onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
+
+</script>
+</body>
+</html>

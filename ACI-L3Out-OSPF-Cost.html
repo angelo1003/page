@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ACI L3Out OSPF · 외부 경로 Cost/Metric 조정 가이드 (Cisco 공식 검증)</title>
+<style>
+  :root{
+    --bg:#0a0e17; --bg-2:#0f1521; --panel:#121a28; --panel-2:#16202f;
+    --border:#243044; --border-2:#2e3c54;
+    --txt:#dce3ee; --txt-dim:#9fb0c6; --txt-faint:#6c7d96;
+    --accent:#16c7c1; --accent-2:#1ba0e2; --accent-3:#6f6cf6;
+    --ok:#22c98a; --warn:#f5b942; --danger:#f0556b; --info:#3aa0ff; --tip:#28d3a0;
+    --code-bg:#0b111c; --code-border:#1f2c40;
+    --shadow:0 10px 40px rgba(0,0,0,.45);
+    --mono:"SF Mono", "JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo",Roboto,"Noto Sans KR",sans-serif;
+    --sidebar-w:310px;
+  }
+  html[data-theme="light"]{
+    --bg:#eef2f7; --bg-2:#e6ecf3; --panel:#ffffff; --panel-2:#f5f8fc;
+    --border:#d4dde8; --border-2:#c2cfde;
+    --txt:#15212f; --txt-dim:#41546b; --txt-faint:#71839a;
+    --code-bg:#0b111c; --code-border:#1f2c40;
+    --shadow:0 8px 30px rgba(40,60,90,.12);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(22,199,193,.10), transparent 60%),
+      radial-gradient(1000px 500px at -10% 10%, rgba(111,108,246,.10), transparent 55%),
+      var(--bg);
+    color:var(--txt); font-family:var(--sans); font-size:16px; line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:60;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2),var(--accent-3));
+    box-shadow:0 0 12px rgba(22,199,193,.6);transition:width .1s ease-out}
+
+  .wrap{display:flex;max-width:1500px;margin:0 auto;gap:0}
+  .sidebar{
+    width:var(--sidebar-w);flex:0 0 var(--sidebar-w);position:sticky;top:0;height:100vh;
+    overflow-y:auto;padding:26px 18px 60px;border-right:1px solid var(--border);
+    background:linear-gradient(180deg,var(--bg-2),var(--bg));backdrop-filter:blur(6px);
+  }
+  .sidebar::-webkit-scrollbar{width:8px}
+  .sidebar::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:8px}
+  .brand{display:flex;align-items:center;gap:11px;margin-bottom:6px}
+  .brand .logo{width:40px;height:40px;border-radius:11px;flex:0 0 40px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    display:grid;place-items:center;font-weight:800;color:#04121a;font-size:15px;
+    box-shadow:0 6px 18px rgba(22,199,193,.35)}
+  .brand h1{font-size:15px;margin:0;line-height:1.25;font-weight:750;letter-spacing:.2px}
+  .brand .sub{font-size:11px;color:var(--txt-faint);margin-top:2px}
+  .side-meta{font-size:11px;color:var(--txt-faint);margin:14px 0 14px;padding:11px 13px;
+    border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+  .side-meta b{color:var(--accent)}
+  .verify-badge{display:flex;align-items:center;gap:9px;margin:12px 0 8px;padding:11px 13px;
+    border:1px solid rgba(34,201,138,.35);border-radius:10px;
+    background:linear-gradient(100deg,rgba(34,201,138,.13),transparent 80%)}
+  .verify-badge .vi{width:26px;height:26px;flex:0 0 26px;border-radius:8px;display:grid;place-items:center;
+    background:rgba(34,201,138,.18);color:var(--ok);font-size:15px;font-weight:800}
+  .verify-badge .vt{font-size:11.5px;line-height:1.4}
+  .verify-badge .vt b{color:var(--ok);font-weight:750}
+  .toc-title{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;
+    color:var(--txt-faint);margin:18px 6px 8px;font-weight:700}
+  nav.toc a{
+    display:flex;align-items:center;gap:9px;padding:7px 11px;margin:2px 0;border-radius:8px;
+    color:var(--txt-dim);text-decoration:none;font-size:13.5px;font-weight:500;
+    border:1px solid transparent;transition:.15s;position:relative
+  }
+  nav.toc a .num{font-variant-numeric:tabular-nums;font-size:11px;color:var(--txt-faint);
+    width:20px;flex:0 0 20px;text-align:right;font-family:var(--mono)}
+  nav.toc a:hover{background:var(--panel);color:var(--txt);border-color:var(--border)}
+  nav.toc a.active{background:linear-gradient(90deg,rgba(22,199,193,.16),rgba(27,160,226,.06));
+    color:#fff;border-color:var(--border-2)}
+  nav.toc a.active .num{color:var(--accent)}
+  nav.toc a.active::before{content:"";position:absolute;left:-1px;top:8px;bottom:8px;width:3px;
+    border-radius:3px;background:linear-gradient(var(--accent),var(--accent-2))}
+
+  main{flex:1 1 auto;min-width:0;padding:0 0 120px}
+  .topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:12px 30px;border-bottom:1px solid var(--border);
+    background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(10px)}
+  .topbar .crumb{font-size:12.5px;color:var(--txt-faint);flex:1 1 auto}
+  .topbar .crumb b{color:var(--txt-dim)}
+  .btn{display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1px solid var(--border);
+    background:var(--panel);color:var(--txt-dim);border-radius:9px;padding:7px 12px;font-size:12.5px;
+    font-weight:600;transition:.15s;font-family:inherit}
+  .btn:hover{color:var(--txt);border-color:var(--border-2);background:var(--panel-2)}
+  .search{display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--panel);
+    border-radius:9px;padding:6px 11px;min-width:200px}
+  .search input{background:transparent;border:0;outline:0;color:var(--txt);font-size:13px;width:100%;font-family:inherit}
+  .search svg{flex:0 0 14px;opacity:.6}
+
+  .content{max-width:980px;margin:0 auto;padding:0 30px}
+
+  .hero{margin:40px 0 30px;padding:38px 34px;border-radius:20px;position:relative;overflow:hidden;
+    border:1px solid var(--border);
+    background:
+      radial-gradient(700px 240px at 90% -30%, rgba(27,160,226,.22), transparent 60%),
+      radial-gradient(600px 240px at 0% 120%, rgba(111,108,246,.18), transparent 55%),
+      linear-gradient(160deg,var(--panel-2),var(--panel))}
+  .hero::after{content:"";position:absolute;inset:0;
+    background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:34px 34px;opacity:.10;mask-image:radial-gradient(600px 300px at 80% 0%,#000,transparent)}
+  .hero .eyebrow{position:relative;z-index:1;display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;
+    letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);
+    border:1px solid var(--border-2);border-radius:999px;padding:5px 13px;background:rgba(22,199,193,.07)}
+  .hero h2{position:relative;z-index:1;font-size:38px;line-height:1.15;margin:18px 0 10px;font-weight:800;letter-spacing:-.5px}
+  .hero h2 .grad{background:linear-gradient(100deg,var(--accent),var(--accent-2) 55%,var(--accent-3));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lead{position:relative;z-index:1;color:var(--txt-dim);font-size:16px;max-width:700px;margin:0 0 20px}
+  .hero .chips{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:9px}
+  .chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--txt-dim);
+    border:1px solid var(--border);background:var(--panel);border-radius:999px;padding:6px 13px}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  .chip.v .dot{background:var(--accent-2)} .chip.a .dot{background:var(--accent-3)} .chip.u .dot{background:var(--warn)}
+
+  .meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:22px 0 8px}
+  .meta-card{border:1px solid var(--border);border-radius:14px;padding:16px 18px;background:var(--panel);
+    position:relative;overflow:hidden}
+  .meta-card .k{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--txt-faint);font-weight:700}
+  .meta-card .v{font-size:15px;color:var(--txt);margin-top:6px;font-weight:650}
+  .meta-card .v small{color:var(--txt-dim);font-weight:500}
+  .meta-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:linear-gradient(var(--accent),var(--accent-2))}
+
+  section{scroll-margin-top:70px;margin:54px 0}
+  section > h2.sec{font-size:27px;font-weight:780;letter-spacing:-.3px;margin:0 0 6px;display:flex;align-items:center;gap:14px}
+  section > h2.sec .idx{font-family:var(--mono);font-size:15px;font-weight:700;color:#04121a;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));border-radius:9px;
+    min-width:34px;height:34px;display:grid;place-items:center;flex:0 0 auto;box-shadow:0 4px 14px rgba(22,199,193,.3)}
+  .sec-rule{height:1px;background:linear-gradient(90deg,var(--border-2),transparent);margin:14px 0 22px}
+  h3.sub{font-size:18.5px;font-weight:700;margin:30px 0 10px;color:var(--txt);
+    padding-left:13px;border-left:3px solid var(--accent);line-height:1.3}
+  h4.subsub{font-size:15px;font-weight:700;margin:22px 0 8px;color:var(--accent-2)}
+  p{margin:12px 0}
+  a{color:var(--accent-2);text-decoration:none;border-bottom:1px dashed transparent}
+  a:hover{border-bottom-color:var(--accent-2)}
+  strong{color:#fff;font-weight:700}
+  html[data-theme="light"] strong{color:#0a1622}
+  em{color:var(--txt-dim);font-style:italic}
+  ul,ol{margin:12px 0;padding-left:22px}
+  li{margin:7px 0}
+  li::marker{color:var(--accent)}
+
+  code.inl{font-family:var(--mono);font-size:.86em;background:var(--code-bg);color:#7fe9d8;
+    border:1px solid var(--code-border);border-radius:6px;padding:1.5px 6px;white-space:nowrap}
+
+  .code{position:relative;margin:18px 0;border:1px solid var(--code-border);border-radius:13px;overflow:hidden;
+    background:var(--code-bg);box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)}
+  .code .bar{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--code-border);
+    background:linear-gradient(180deg,#0e1726,#0a111d)}
+  .code .bar .dots{display:flex;gap:6px;margin-right:6px}
+  .code .bar .dots i{width:11px;height:11px;border-radius:50%;display:block}
+  .code .bar .dots i:nth-child(1){background:#ff5f57} .code .bar .dots i:nth-child(2){background:#febc2e} .code .bar .dots i:nth-child(3){background:#28c840}
+  .code .bar .lang{font-family:var(--mono);font-size:11px;letter-spacing:.5px;color:var(--txt-faint);
+    text-transform:uppercase;font-weight:700}
+  .code .bar .copy{margin-left:auto;cursor:pointer;border:1px solid var(--code-border);background:#0c1320;
+    color:var(--txt-dim);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;font-family:var(--sans);transition:.15s}
+  .code .bar .copy:hover{color:#fff;border-color:var(--border-2)}
+  .code .bar .copy.done{color:var(--ok);border-color:var(--ok)}
+  .code pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.65;color:#cdd9ea}
+  .code pre::-webkit-scrollbar{height:9px} .code pre::-webkit-scrollbar-thumb{background:#243044;border-radius:8px}
+  .diagram pre{color:#8fd4ff;font-size:12.5px;line-height:1.55;letter-spacing:0}
+  .diagram .bar .lang::after{content:" · topology"}
+  .t-tag{color:#6f9bff} .t-attr{color:#7fe9d8} .t-str{color:#f5b97a} .t-cmt{color:#5c7088;font-style:italic}
+  .t-kw{color:#c98bdb} .t-num{color:#8fe0a0} .t-prompt{color:#22c98a} .t-hi{color:#ffd479;font-weight:700}
+
+  .tbl-wrap{margin:18px 0;border:1px solid var(--border);border-radius:13px;overflow:auto;box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+  thead th{background:linear-gradient(180deg,var(--panel-2),var(--panel));color:var(--txt);
+    text-align:left;font-weight:700;padding:12px 15px;border-bottom:1px solid var(--border-2);
+    position:sticky;top:0;white-space:nowrap;font-size:12.5px;letter-spacing:.2px}
+  tbody td{padding:11px 15px;border-bottom:1px solid var(--border);color:var(--txt-dim);vertical-align:top}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:nth-child(even){background:rgba(255,255,255,.015)}
+  tbody tr:hover{background:rgba(22,199,193,.05)}
+  td strong,th strong{color:#fff}
+  html[data-theme="light"] td strong{color:#0a1622}
+  .center{text-align:center}
+  .ver{font-family:var(--mono);font-weight:700;color:var(--accent);font-size:12.5px;white-space:nowrap}
+  .yes{color:var(--ok);font-weight:700} .no{color:var(--danger);font-weight:700} .part{color:var(--warn);font-weight:700}
+
+  .callout{display:flex;gap:14px;margin:18px 0;padding:15px 18px;border-radius:13px;border:1px solid var(--border);
+    background:var(--panel);position:relative;overflow:hidden}
+  .callout::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .callout .ico{flex:0 0 26px;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:15px;font-weight:800}
+  .callout .body{flex:1;min-width:0}
+  .callout .body p{margin:4px 0}
+  .callout .lbl{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+  .callout.note{background:linear-gradient(100deg,rgba(58,160,255,.10),transparent 70%)}
+  .callout.note::before{background:var(--info)} .callout.note .ico{background:rgba(58,160,255,.16);color:var(--info)} .callout.note .lbl{color:var(--info)}
+  .callout.tip{background:linear-gradient(100deg,rgba(40,211,160,.10),transparent 70%)}
+  .callout.tip::before{background:var(--tip)} .callout.tip .ico{background:rgba(40,211,160,.16);color:var(--tip)} .callout.tip .lbl{color:var(--tip)}
+  .callout.warn{background:linear-gradient(100deg,rgba(245,185,66,.10),transparent 70%)}
+  .callout.warn::before{background:var(--warn)} .callout.warn .ico{background:rgba(245,185,66,.16);color:var(--warn)} .callout.warn .lbl{color:var(--warn)}
+  .callout.danger{background:linear-gradient(100deg,rgba(240,85,107,.10),transparent 70%)}
+  .callout.danger::before{background:var(--danger)} .callout.danger .ico{background:rgba(240,85,107,.16);color:var(--danger)} .callout.danger .lbl{color:var(--danger)}
+
+  .terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin:18px 0}
+  .term{border:1px solid var(--border);border-radius:13px;padding:16px 17px;background:var(--panel);transition:.18s}
+  .term:hover{border-color:var(--border-2);transform:translateY(-2px);box-shadow:var(--shadow)}
+  .term .t{font-weight:750;color:#fff;font-size:14.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+  html[data-theme="light"] .term .t{color:#0a1622}
+  .term .t .pill{font-size:10px;font-family:var(--mono);font-weight:700;padding:2px 7px;border-radius:6px}
+  .pill.north{background:rgba(245,185,66,.16);color:var(--warn)}
+  .pill.south{background:rgba(22,199,193,.16);color:var(--accent)}
+  .term .d{font-size:13px;color:var(--txt-dim);line-height:1.6}
+
+  .steps{counter-reset:st;margin:18px 0;padding:0;list-style:none}
+  .steps>li{counter-increment:st;position:relative;padding:4px 0 18px 46px;margin:0}
+  .steps>li::before{content:counter(st);position:absolute;left:0;top:0;width:30px;height:30px;border-radius:9px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04121a;font-weight:800;font-size:14px;
+    display:grid;place-items:center;box-shadow:0 4px 12px rgba(22,199,193,.3)}
+  .steps>li::after{content:"";position:absolute;left:14px;top:32px;bottom:2px;width:2px;background:var(--border)}
+  .steps>li:last-child::after{display:none}
+  .steps>li .stt{font-weight:700;color:#fff;font-size:14.5px}
+  html[data-theme="light"] .steps>li .stt{color:#0a1622}
+  .steps>li .loc{font-size:11.5px;color:var(--accent-2);font-family:var(--mono);margin:4px 0}
+  .steps>li ul{margin:8px 0}
+
+  .check{list-style:none;padding:0;margin:18px 0;display:grid;gap:8px}
+  .check li{display:flex;gap:11px;align-items:flex-start;padding:11px 14px;border:1px solid var(--border);
+    border-radius:10px;background:var(--panel);font-size:13.5px;color:var(--txt-dim);cursor:pointer;transition:.15s}
+  .check li:hover{border-color:var(--border-2);background:var(--panel-2)}
+  .check li .box{flex:0 0 19px;width:19px;height:19px;border-radius:6px;border:2px solid var(--border-2);
+    display:grid;place-items:center;margin-top:1px;transition:.15s;font-size:12px;color:transparent}
+  .check li.done .box{background:var(--ok);border-color:var(--ok);color:#04121a}
+  .check li.done{color:var(--txt-faint)}
+  .check li.done span.tx{text-decoration:line-through}
+
+  .bdg{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;
+    border:1px solid var(--border-2);color:var(--accent);background:rgba(22,199,193,.08);vertical-align:middle}
+  .bdg.rel{color:var(--accent-2);background:rgba(27,160,226,.08)}
+
+  /* verdict cards */
+  .verdicts{display:grid;gap:14px;margin:20px 0}
+  .vc{border:1px solid var(--border);border-radius:14px;background:var(--panel);overflow:hidden;position:relative}
+  .vc .vc-h{display:flex;align-items:center;gap:13px;padding:14px 17px;border-bottom:1px solid var(--border)}
+  .vc .vc-n{font-family:var(--mono);font-size:12px;font-weight:800;width:30px;height:30px;flex:0 0 30px;border-radius:8px;
+    display:grid;place-items:center;background:var(--panel-2);border:1px solid var(--border-2);color:var(--txt-dim)}
+  .vc .vc-q{font-weight:700;color:#fff;font-size:14.5px;flex:1;line-height:1.4}
+  html[data-theme="light"] .vc .vc-q{color:#0a1622}
+  .vc .tag-verdict{font-size:11px;font-weight:800;letter-spacing:.5px;padding:5px 11px;border-radius:999px;white-space:nowrap;text-transform:uppercase}
+  .tag-yes{background:rgba(34,201,138,.16);color:var(--ok);border:1px solid rgba(34,201,138,.4)}
+  .tag-part{background:rgba(245,185,66,.16);color:var(--warn);border:1px solid rgba(245,185,66,.4)}
+  .tag-no{background:rgba(240,85,107,.16);color:var(--danger);border:1px solid rgba(240,85,107,.4)}
+  .vc .vc-b{padding:13px 17px;font-size:13.5px;color:var(--txt-dim);line-height:1.65}
+  .vc .vc-b .src{margin-top:9px;font-size:11.5px;color:var(--txt-faint)}
+  .vc .vc-b .src a{font-size:11.5px}
+  .vc.ok::after,.vc.part::after,.vc.no::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .vc.ok::after{background:var(--ok)} .vc.part::after{background:var(--warn)} .vc.no::after{background:var(--danger)}
+
+  /* flow boxes */
+  .flow{display:flex;flex-direction:column;align-items:center;gap:0;margin:20px 0}
+  .flow .node{border:1px solid var(--border-2);border-radius:12px;padding:13px 20px;background:var(--panel);
+    text-align:center;min-width:280px;max-width:520px;position:relative}
+  .flow .node .nt{font-weight:750;color:#fff;font-size:14px}
+  html[data-theme="light"] .flow .node .nt{color:#0a1622}
+  .flow .node .nd{font-size:12px;color:var(--txt-dim);margin-top:3px}
+  .flow .node.hot{border-color:var(--accent);background:linear-gradient(160deg,rgba(22,199,193,.12),var(--panel));
+    box-shadow:0 0 0 1px rgba(22,199,193,.25),0 8px 24px rgba(22,199,193,.12)}
+  .flow .node.hot .nt{color:var(--accent)}
+  .flow .arrow{color:var(--accent-2);font-size:20px;line-height:1;padding:7px 0;font-weight:700}
+  .flow .arrow small{display:block;font-size:10.5px;color:var(--txt-faint);font-weight:600;letter-spacing:.3px;margin-top:2px;font-family:var(--mono)}
+
+  /* reference list */
+  .refs{list-style:none;padding:0;margin:18px 0;display:grid;gap:10px}
+  .refs li{display:flex;gap:13px;align-items:flex-start;padding:13px 16px;border:1px solid var(--border);
+    border-radius:12px;background:var(--panel);transition:.15s}
+  .refs li:hover{border-color:var(--border-2);background:var(--panel-2)}
+  .refs li .rn{font-family:var(--mono);font-size:12px;font-weight:800;color:var(--accent);flex:0 0 26px}
+  .refs li .rc{flex:1;min-width:0}
+  .refs li .rc .rt{font-weight:650;color:var(--txt);font-size:13.5px;margin-bottom:3px}
+  .refs li .rc .ru{font-size:11.5px;word-break:break-all}
+
+  footer{max-width:980px;margin:60px auto 0;padding:26px 30px;border-top:1px solid var(--border);
+    color:var(--txt-faint);font-size:12.5px}
+  footer .disc{padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--panel);
+    color:var(--txt-dim);margin-bottom:16px}
+
+  #toTop{position:fixed;right:24px;bottom:24px;z-index:50;width:46px;height:46px;border-radius:13px;cursor:pointer;
+    border:1px solid var(--border-2);background:var(--panel);color:var(--accent);display:grid;place-items:center;
+    box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.25s;font-size:18px}
+  #toTop.show{opacity:1;pointer-events:auto}
+  #toTop:hover{background:var(--panel-2);transform:translateY(-3px)}
+
+  .mobile-toggle{display:none}
+  @media(max-width:1080px){
+    .sidebar{position:fixed;left:0;top:0;z-index:70;transform:translateX(-100%);transition:transform .25s;box-shadow:var(--shadow)}
+    .sidebar.open{transform:translateX(0)}
+    .mobile-toggle{display:inline-flex}
+    .hero h2{font-size:30px}
+    .search{min-width:auto}
+  }
+  @media(max-width:680px){
+    .content,.topbar{padding-left:16px;padding-right:16px}
+    .hero{padding:26px 20px} .hero h2{font-size:24px}
+    section>h2.sec{font-size:21px}
+    .topbar .crumb{display:none}
+    .search input{width:110px}
+    .vc .vc-h{flex-wrap:wrap}
+  }
+  #scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:65;opacity:0;pointer-events:none;transition:.25s}
+  #scrim.show{opacity:1;pointer-events:auto}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="scrim"></div>
+<div class="wrap">
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="logo">L3</div>
+    <div>
+      <h1>L3Out OSPF Cost 조정</h1>
+      <div class="sub">외부 경로 Metric 제어 가이드</div>
+    </div>
+  </div>
+  <div class="side-meta">
+    <div>대상 · <b>ACI 네트워크 엔지니어</b></div>
+    <div style="margin-top:5px">기준 · APIC 6.2(x) 기준 동작</div>
+  </div>
+  <div class="verify-badge">
+    <div class="vi">✓</div>
+    <div class="vt"><b>Cisco 공식 문서 교차검증 완료</b><br>White Paper · L3 Config Guide · TechZone</div>
+  </div>
+  <div class="toc-title">목차 · Contents</div>
+  <nav class="toc" id="toc">
+    <a href="#s1"><span class="num">01</span> 질문과 핵심 결론</a>
+    <a href="#s2"><span class="num">02</span> 경로 전파 흐름</a>
+    <a href="#s3"><span class="num">03</span> 어디서 조정하나</a>
+    <a href="#s4"><span class="num">04</span> North vs South Metric</a>
+    <a href="#s5"><span class="num">05</span> Local Pref vs MED</a>
+    <a href="#s6"><span class="num">06</span> 설정 절차 (GUI)</a>
+    <a href="#s7"><span class="num">07</span> Default Route 시나리오</a>
+    <a href="#s8"><span class="num">08</span> 검증 결과표</a>
+    <a href="#s9"><span class="num">09</span> 체크리스트</a>
+    <a href="#s10"><span class="num">10</span> 참고 문서</a>
+  </nav>
+</aside>
+
+<main>
+  <div class="topbar">
+    <button class="btn mobile-toggle" id="menuBtn" aria-label="menu">☰</button>
+    <div class="crumb"><b>Cisco ACI</b> &nbsp;›&nbsp; L3Out · OSPF &nbsp;›&nbsp; Route Control / Metric</div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="searchInput" type="text" placeholder="문서 내 검색…" />
+    </div>
+    <button class="btn" id="themeBtn" title="테마 전환">🌙 <span id="themeLbl">Dark</span></button>
+  </div>
+
+  <div class="content" id="content">
+
+    <div class="hero">
+      <span class="eyebrow">◆ Cisco Application Centric Infrastructure</span>
+      <h2>L3Out OSPF · 외부 경로 <span class="grad">Cost / Metric</span> 조정</h2>
+      <p class="lead">L3Out을 OSPF로 구성했을 때, 외부에서 학습한 경로를 fabric 내부의 다른 Leaf로 전달하면서 선호도(metric)를 조정하는 정확한 방법. "Interface OSPF Cost가 아니라 Route Map(Route Profile)"이라는 핵심을 Cisco 공식 문서로 교차검증해 정리한다.</p>
+      <div class="chips">
+        <span class="chip"><span class="dot"></span> Route Map / Route Profile</span>
+        <span class="chip v"><span class="dot"></span> MP-BGP Interleak</span>
+        <span class="chip a"><span class="dot"></span> Set Local Preference</span>
+        <span class="chip u"><span class="dot"></span> Import Route Control</span>
+      </div>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-card"><div class="k">조정 위치</div><div class="v">Route Map <small>· Import 방향</small></div></div>
+      <div class="meta-card"><div class="k">권장 속성</div><div class="v">Set Local Preference</div></div>
+      <div class="meta-card"><div class="k">내부 전파</div><div class="v">MP-BGP VPNv4 <small>via Spine RR</small></div></div>
+      <div class="meta-card"><div class="k">검증 출처</div><div class="v">Cisco.com <small>공식 5종</small></div></div>
+    </div>
+
+    <div class="callout tip">
+      <div class="ico">✓</div>
+      <div class="body">
+        <div class="lbl">검증 상태</div>
+        <p>이 문서의 모든 핵심 주장은 <strong>Cisco 내부 지식 소스(Circuit / ciscodata)</strong>를 통해 <strong>Cisco 공식 White Paper 및 APIC L3 Configuration Guide 6.2(x)</strong>와 교차검증되었습니다. 항목별 판정과 출처는 <a href="#s8">8. 검증 결과표</a> 참조.</p>
+      </div>
+    </div>
+
+<!-- ============ 1 ============ -->
+<section id="s1">
+  <h2 class="sec"><span class="idx">01</span> 질문과 핵심 결론</h2>
+  <div class="sec-rule"></div>
+
+  <h3 class="sub">1.1 원래 질문</h3>
+  <div class="callout note">
+    <div class="ico">Q</div>
+    <div class="body">
+      <p style="font-size:15px;color:var(--txt)"><strong>"ACI L3Out을 OSPF로 구성 시, 학습된 외부 네트워크를 내부 Leaf로 전달할 때 Cost를 조정하는 가장 좋은 방법은?"</strong></p>
+    </div>
+  </div>
+
+  <h3 class="sub">1.2 한 줄 결론</h3>
+  <div class="callout tip">
+    <div class="ico">★</div>
+    <div class="body">
+      <div class="lbl">Best Practice</div>
+      <p>외부에서 학습한 경로를 <strong>내부 Leaf로 전달할 때의 선호도 조정</strong>은 Border Leaf의 <em>Interface OSPF Cost</em>가 아니라 <strong>Route Map(Route Profile)의 Set Rule</strong>을 <strong>Import 방향</strong>에서 적용하는 것이 정답이다. 단일 metric(MED)보다 <strong>Set Local Preference(APIC의 Set Preference)</strong>를 우선 사용하면 fabric 내부 BGP best-path에서 더 결정적이고 예측 가능하게 동작한다.</p>
+    </div>
+  </div>
+
+  <h3 class="sub">1.3 왜 흔히 혼동하는가</h3>
+  <p>"Cost 조정"이라고 하면 OSPF 인터페이스 cost를 먼저 떠올리기 쉽다. 그러나 ACI fabric 안에서 <strong>외부 경로가 다른 Leaf로 전파되는 매체는 OSPF가 아니라 MP-BGP</strong>다. 따라서 "내부 Leaf로 전달할 때"의 제어 지점은 OSPF가 아니라 <strong>BGP 속성</strong>이며, 이를 APIC에서 다루는 객체가 <strong>Route Map / Route Profile</strong>이다.</p>
+
+  <div class="callout danger">
+    <div class="ico">!</div>
+    <div class="body">
+      <div class="lbl">자주 하는 오해 — 정정</div>
+      <p>"OSPF cost가 redistribute될 때 BGP MED로 <strong>자동 상속된다</strong>"는 것은 <strong>사실이 아니다</strong>. ACI의 OSPF→MP-BGP interleak 과정에서 OSPF cost는 BGP MED로 자동 전달되지 않으며, 필요한 metric은 <strong>Route Profile의 Set Rule로 명시적으로 설정</strong>해야 한다. (상세: <a href="#s5">§5</a>, 출처 <a href="#s10">[5]</a>)</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="s2">
+  <h2 class="sec"><span class="idx">02</span> 외부 경로의 fabric 내부 전파 흐름</h2>
+  <div class="sec-rule"></div>
+
+  <p>외부 OSPF neighbor에서 학습한 경로가 다른 Leaf까지 도달하는 전체 흐름이다. <strong>★ 표시 지점이 바로 조정 포인트</strong>다.</p>
+
+  <div class="flow">
+    <div class="node">
+      <div class="nt">External OSPF Neighbor</div>
+      <div class="nd">외부 라우터 / 방화벽 — OSPF로 external route 광고</div>
+    </div>
+    <div class="arrow">↓<small>OSPF (북쪽 / North)</small></div>
+    <div class="node hot">
+      <div class="nt">★ Border Leaf (L3Out)</div>
+      <div class="nd">OSPF → <strong>MP-BGP VPNv4/v6 로 interleak (redistribute)</strong> — 여기서 Route Map 적용</div>
+    </div>
+    <div class="arrow">↓<small>iBGP VPNv4 (overlay-1 / infra VRF)</small></div>
+    <div class="node">
+      <div class="nt">Spine (Route Reflector)</div>
+      <div class="nd">MP-BGP RR — 모든 Leaf로 reflect</div>
+    </div>
+    <div class="arrow">↓<small>iBGP VPNv4</small></div>
+    <div class="node">
+      <div class="nt">Compute Leaf (수신 측)</div>
+      <div class="nd">VPNv4 경로를 user VRF로 import — best-path 선택 (Local Pref &gt; Weight &gt; … &gt; MED)</div>
+    </div>
+  </div>
+
+  <div class="callout note">
+    <div class="ico">i</div>
+    <div class="body">
+      <div class="lbl">핵심</div>
+      <p>모든 Leaf와 Spine은 동일 BGP AS 내에서 <strong>iBGP</strong> 세션을 맺고, 외부 경로는 <code class="inl">overlay-1</code>(infra) VRF 내에서 <strong>VPNv4/v6</strong>로 분배된다. 수신 Leaf는 이를 다시 사용자 VRF로 가져와 사용한다. 즉 <strong>"내부 Leaf로 전달" = MP-BGP 전파</strong>이며, 제어 대상은 BGP 속성이다.</p>
+      <p class="src" style="font-size:11.5px;color:var(--txt-faint);margin-top:8px">출처: ACI Fabric L3Out White Paper <a href="#s10">[1]</a>, APIC L3 Networking Config Guide 6.2(x) — WAN/External Forwarding <a href="#s10">[2]</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="s3">
+  <h2 class="sec"><span class="idx">03</span> 어디서 무엇을 조정하나</h2>
+  <div class="sec-rule"></div>
+
+  <p>ACI에서 metric/preference를 다루는 객체와 그 역할이다.</p>
+
+  <div class="terms">
+    <div class="term">
+      <div class="t">Match Rule <span class="pill south">Match</span></div>
+      <div class="d">조정 대상이 될 외부 prefix를 매칭한다. <code class="inl">0.0.0.0/0</code> 같은 default 또는 특정 external subnet. <br><small>Tenant &gt; Policies &gt; Protocol &gt; <strong>Match Rules for Route Map</strong></small></div>
+    </div>
+    <div class="term">
+      <div class="t">Set Rule <span class="pill south">Set</span></div>
+      <div class="d">매칭된 경로에 적용할 값. <strong>Set Preference</strong>(Local Pref), <strong>Set Metric</strong>(MED), Set Weight, Set Community 등. <br><small>Tenant &gt; Policies &gt; Protocol &gt; <strong>Set Rules for Route Map</strong></small></div>
+    </div>
+    <div class="term">
+      <div class="t">Route Map / Route Profile <span class="pill south">Apply</span></div>
+      <div class="d">Match + Set 을 묶는 정책. Import/Export 방향과 Permit/Deny를 가진 context 단위로 구성. <br><small>Tenant &gt; Networking &gt; L3Outs &gt; [L3Out] &gt; <strong>Route map for import and export route control</strong></small></div>
+    </div>
+    <div class="term">
+      <div class="t">Interface OSPF Policy <span class="pill north">North</span></div>
+      <div class="d"><code class="inl">Cost of Interface</code> — <strong>외부 OSPF 도메인 쪽 SPF</strong>에만 영향. 내부 Leaf 전파와는 무관. <br><small>L3Out &gt; Logical Interface Profile &gt; OSPF Interface Policy</small></div>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ico">→</div>
+    <div class="body">
+      <div class="lbl">매핑</div>
+      <p>질문의 <strong>"내부 Leaf로 전달할 때 cost 조정"</strong> = <span class="pill south" style="font-size:11px">Set Rule</span> 을 <strong>Import 방향 Route Map</strong>에 넣는 것. <span class="pill north" style="font-size:11px">North</span> Interface OSPF Cost는 이 질문의 답이 아니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="s4">
+  <h2 class="sec"><span class="idx">04</span> North(외부) vs South(내부) Metric 비교</h2>
+  <div class="sec-rule"></div>
+
+  <p>두 가지 "cost"는 영향 범위와 설정 위치가 완전히 다르다. 이 구분이 이 주제의 핵심이다.</p>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr><th>구분</th><th>Interface OSPF Cost <span class="pill north" style="font-size:10px">North</span></th><th>Route Control · Set Rule <span class="pill south" style="font-size:10px">South</span></th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>영향 범위</strong></td><td>L3Out ↔ 외부 OSPF neighbor 간 (북쪽 / outbound SPF)</td><td>fabric 내부 MP-BGP 경로 전파 (남쪽 / 내부 방향)</td></tr>
+      <tr><td><strong>프로토콜</strong></td><td>OSPF</td><td>MP-BGP (VPNv4/v6)</td></tr>
+      <tr><td><strong>설정 위치</strong></td><td>L3Out &gt; Logical Interface Profile &gt; OSPF Interface Policy (<code class="inl">Cost of Interface</code>)</td><td>Route Map 의 Set Rule (<code class="inl">Set Preference</code> / <code class="inl">Set Metric</code>)</td></tr>
+      <tr><td><strong>용도</strong></td><td>외부 OSPF SPF 계산에서 이 인터페이스 비용 조정</td><td>내부 Leaf가 여러 Border Leaf 중 어디로 나갈지 제어</td></tr>
+      <tr><td><strong>"내부 Leaf 전달"에 해당?</strong></td><td class="center"><span class="no">✕ 아니오</span></td><td class="center"><span class="yes">✓ 예 — 정확히 이 케이스</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ico">⚠</div>
+    <div class="body">
+      <div class="lbl">주의</div>
+      <p>Interface OSPF Cost를 올려도 <strong>내부 Leaf의 경로 선택은 바뀌지 않는다</strong>. 내부 선택은 BGP best-path가 결정하며, OSPF cost는 그 입력값으로 자동 상속되지도 않는다. 내부 선호도를 바꾸려면 반드시 <span class="pill south" style="font-size:11px">Set Rule</span> 을 써야 한다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="s5">
+  <h2 class="sec"><span class="idx">05</span> Set Local Preference vs Set Metric(MED)</h2>
+  <div class="sec-rule"></div>
+
+  <h3 class="sub">5.1 왜 Local Preference가 우선인가</h3>
+  <p>여러 Border Leaf가 같은 prefix를 광고할 때, compute Leaf는 <strong>BGP best-path 알고리즘</strong>으로 하나를 고른다. 그 우선순위에서 <strong>Local Preference</strong>는 <strong>MED</strong>보다 훨씬 위에 있다.</p>
+
+  <div class="code">
+    <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="lang">BGP best-path 우선순위 (높은 것부터)</span><button class="copy">복사</button></div>
+<pre><span class="t-hi">Weight</span>  (Cisco 독자, 로컬)
+  &gt; <span class="t-hi">Local Preference</span>   ← ★ Set Preference 로 제어 (권장)
+  &gt; Locally originated
+  &gt; AS-Path 길이
+  &gt; Origin
+  &gt; <span class="t-num">MED (Multi-Exit Discriminator)</span>   ← Set Metric 으로 제어 (하위)
+  &gt; eBGP &gt; iBGP
+  &gt; ...</pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ico">★</div>
+    <div class="body">
+      <div class="lbl">결론</div>
+      <p>특정 Border Leaf 경로를 선호시키려면 <strong>Set Local Preference(Set Preference)를 권장</strong>한다. MED는 우선순위가 낮아 다른 속성에 의해 무력화될 수 있고, MED 비교에는 조건(같은 인접 AS 등)이 붙어 fabric 내부에서 덜 결정적이다.</p>
+    </div>
+  </div>
+
+  <h3 class="sub">5.2 ★ OSPF cost는 MED로 자동 상속되지 않는다</h3>
+  <div class="callout danger">
+    <div class="ico">!</div>
+    <div class="body">
+      <div class="lbl">정정 — 공식 문서 기준</div>
+      <p>OSPF external route가 MP-BGP로 redistribute(interleak)될 때 <strong>OSPF cost가 BGP MED로 자동 상속되지 않는다</strong>. metric/preference/community는 <strong>Route Profile의 Set Rule을 통해 명시적으로 설정</strong>해야 적용된다.</p>
+      <p class="src" style="font-size:11.5px;color:var(--txt-faint);margin-top:8px">출처: APIC L3 Networking Config Guide 6.2(x) — Route Control with Route Maps and Route Profiles <a href="#s10">[5]</a></p>
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr><th>속성</th><th>APIC Set Rule 이름</th><th>BGP 우선순위</th><th>권장 용도</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Local Preference</strong></td><td><code class="inl">Set Preference</code></td><td class="center"><span class="yes">높음</span></td><td>여러 Border Leaf 중 <strong>특정 경로 선호</strong> (1순위 권장)</td></tr>
+      <tr><td><strong>Weight</strong></td><td><code class="inl">Set Weight</code></td><td class="center"><span class="yes">가장 높음</span></td><td>로컬(해당 Leaf)에만 적용 — 범위 제한적</td></tr>
+      <tr><td><strong>MED (Metric)</strong></td><td><code class="inl">Set Metric</code></td><td class="center"><span class="part">낮음</span></td><td>외부에 광고하는 metric 또는 보조적 tie-break</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="s6">
+  <h2 class="sec"><span class="idx">06</span> 설정 절차 (APIC GUI)</h2>
+  <div class="sec-rule"></div>
+
+  <p>외부에서 학습한 prefix를 내부 Leaf로 전달할 때 <strong>Local Preference를 높여 특정 Border Leaf를 선호</strong>시키는 표준 절차다.</p>
+
+  <ol class="steps">
+    <li>
+      <div class="stt">Match Rule 생성 — 대상 prefix 매칭</div>
+      <div class="loc">Tenant &gt; Policies &gt; Protocol &gt; Match Rules for Route Map</div>
+      <ul>
+        <li>새 Match Rule 생성 후 <strong>Match Prefix</strong> 추가 (예: 특정 external subnet 또는 <code class="inl">0.0.0.0/0</code>)</li>
+      </ul>
+    </li>
+    <li>
+      <div class="stt">Set Rule 생성 — Local Preference 지정</div>
+      <div class="loc">Tenant &gt; Policies &gt; Protocol &gt; Set Rules for Route Map</div>
+      <ul>
+        <li>새 Set Rule 생성 후 <strong>Set Preference</strong> 체크 → 선호할 경로에 높은 값(예: <code class="inl">200</code>) 부여</li>
+        <li>(선택) 보조적으로 <code class="inl">Set Metric</code> 추가 가능 — 단 MED는 하위 우선순위임을 인지</li>
+      </ul>
+    </li>
+    <li>
+      <div class="stt">Route Map(Route Profile) 생성 + Context 연결</div>
+      <div class="loc">Tenant &gt; Networking &gt; L3Outs &gt; [L3Out] &gt; Route map for import and export route control</div>
+      <ul>
+        <li>Route Map 생성, <strong>Type = Route Control</strong></li>
+        <li>Context 추가 → <strong>Action = Permit</strong>, 위 <strong>Match Rule + Set Rule</strong> 연결</li>
+        <li><strong>Direction = Import</strong> (외부→내부 수신 경로 조정)</li>
+      </ul>
+    </li>
+    <li>
+      <div class="stt">External EPG / Subnet 에 적용</div>
+      <div class="loc">L3Out &gt; External EPGs &gt; [ExtEPG] &gt; Subnet (또는 Route Control Profile)</div>
+      <ul>
+        <li>대상 subnet에 <strong>Import Route Control</strong> 범위 활성화 + 위 Route Map 연결</li>
+      </ul>
+    </li>
+  </ol>
+
+  <div class="callout note">
+    <div class="ico">i</div>
+    <div class="body">
+      <div class="lbl">참고 — 관련 ACI 객체 (REST/MO)</div>
+      <p>위 GUI 설정은 내부적으로 다음 MO에 매핑된다: <code class="inl">rtctrlProfile</code>(Route Map), <code class="inl">rtctrlCtxP</code>(Context), <code class="inl">rtctrlSubjP</code>(Match), <code class="inl">rtctrlAttrP</code>(Set), <code class="inl">rtctrlSetPref</code>(Set Preference), <code class="inl">rtctrlSetRtMetric</code>(Set Metric).</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ico">✎</div>
+    <div class="body">
+      <div class="lbl">개념 예시 — 동등한 IOS 스타일 표현</div>
+      <p>이해를 돕기 위한 의사 표현(실제 ACI는 GUI/MO로 구성):</p>
+    </div>
+  </div>
+  <div class="code">
+    <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="lang">pseudo · route-map import (개념)</span><button class="copy">복사</button></div>
+<pre><span class="t-cmt">! 외부에서 받은 prefix를 내부로 전달 시 Local Pref 상향</span>
+<span class="t-kw">ip prefix-list</span> EXT_NETS <span class="t-kw">permit</span> <span class="t-num">10.10.0.0/16</span>
+<span class="t-kw">route-map</span> IMPORT_PREF <span class="t-kw">permit</span> <span class="t-num">10</span>
+  <span class="t-kw">match ip address prefix-list</span> EXT_NETS
+  <span class="t-kw">set local-preference</span> <span class="t-num">200</span>   <span class="t-cmt">! ← 이 Border Leaf 경로 선호</span></pre>
+  </div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="s7">
+  <h2 class="sec"><span class="idx">07</span> Default Route 선호 시나리오</h2>
+  <div class="sec-rule"></div>
+
+  <p>실무에서 가장 흔한 케이스: 두 개의 L3Out(또는 두 Border Leaf)로 외부에서 <code class="inl">0.0.0.0/0</code> default route를 받고, 하나를 <strong>Active</strong>, 다른 하나를 <strong>Standby</strong>로 쓰고 싶을 때.</p>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr><th>방향</th><th>조정 대상</th><th>방법</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>외부로 광고(Export, 북쪽)</strong></td><td><code class="inl">0.0.0.0/0</code> 광고 metric</td><td>Default Route Leak Policy + OSPF Interface 정책 / Export Set Metric</td></tr>
+      <tr><td><strong>내부로 전달(Import, 남쪽)</strong></td><td>compute Leaf의 default 경로 선호도</td><td><strong>External EPG Route Control → Match <code class="inl">0.0.0.0/0</code> → Set Preference</strong> (Active 경로에 높은 Local Pref)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ico">★</div>
+    <div class="body">
+      <div class="lbl">Active / Standby default</div>
+      <p>Active L3Out의 Import Route Map에서 <code class="inl">0.0.0.0/0</code>에 <strong>Set Preference = 200</strong>, Standby는 기본(100) 유지. compute Leaf는 Local Pref가 높은 Active 경로를 선택하고, Active 장애 시 자동으로 Standby로 수렴한다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="s8">
+  <h2 class="sec"><span class="idx">08</span> 검증 결과표 (Cisco 공식 교차검증)</h2>
+  <div class="sec-rule"></div>
+
+  <p>핵심 주장 5가지를 Cisco 내부 지식 소스(ciscodata)로 공식 문서와 대조한 결과다.</p>
+
+  <div class="verdicts">
+
+    <div class="vc ok">
+      <div class="vc-h">
+        <div class="vc-n">1</div>
+        <div class="vc-q">Border Leaf의 OSPF external route는 MP-BGP VPNv4로 redistribute되어 Spine(RR)을 거쳐 다른 Leaf로 전파된다</div>
+        <div class="tag-verdict tag-yes">맞음</div>
+      </div>
+      <div class="vc-b">
+        외부 경로는 BGP IPv4/IPv6 AF로 interleak되어 MP-BGP VPNv4/v6로 변환되고, <code class="inl">overlay-1</code>(infra) VRF 내에서 Spine RR을 통해 분배된다. 수신 Leaf는 user VRF로 재import한다.
+        <div class="src">출처: White Paper <a href="#s10">[1]</a> · APIC L3 Config Guide 6.2(x) — WAN/External Forwarding <a href="#s10">[2]</a></div>
+      </div>
+    </div>
+
+    <div class="vc part">
+      <div class="vc-h">
+        <div class="vc-n">2</div>
+        <div class="vc-q">"내부 Leaf 전달 시 metric 조정"은 Interface OSPF Cost가 아니라 Route Map Set Rule(Import)이다 / Interface OSPF Cost는 외부 SPF에만 영향</div>
+        <div class="tag-verdict tag-part">부분적 맞음</div>
+      </div>
+      <div class="vc-b">
+        내용은 <strong>전부 정확</strong>하다. 내부 전파 metric은 Route Map으로 조정하고, Interface OSPF Cost는 외부 OSPF SPF에만 영향을 준다. ("부분적"은 표현 보강 차원이며 결론은 옳음.)
+        <div class="src">출처: White Paper <a href="#s10">[1]</a> · Configure Route Control in ACI <a href="#s10">[4]</a></div>
+      </div>
+    </div>
+
+    <div class="vc ok">
+      <div class="vc-h">
+        <div class="vc-n">3</div>
+        <div class="vc-q">여러 Border Leaf 선호 시 Set Metric(MED)보다 Set Local Preference가 더 결정적/안정적이다</div>
+        <div class="tag-verdict tag-yes">맞음</div>
+      </div>
+      <div class="vc-b">
+        BGP best-path에서 Local Preference가 MED보다 우선순위가 높으므로 Set Preference 사용이 더 결정적이고 안정적이다. → Set Local Preference 권장.
+        <div class="src">출처: ACI Fabric L3Out White Paper — Route Profile/Route Map <a href="#s10">[1]</a></div>
+      </div>
+    </div>
+
+    <div class="vc ok">
+      <div class="vc-h">
+        <div class="vc-n">4</div>
+        <div class="vc-q">GUI 경로: L3Out &gt; Route map for import/export route control, Match/Set Rule은 Policies &gt; Protocol 하위</div>
+        <div class="tag-verdict tag-yes">맞음</div>
+      </div>
+      <div class="vc-b">
+        설정 경로 정확. Route Map은 <code class="inl">Tenant &gt; Networking &gt; L3Outs &gt; [L3Out] &gt; Route map for import and export route control</code>, Match/Set Rule은 <code class="inl">Tenant &gt; Policies &gt; Protocol</code> 하위.
+        <div class="src">출처: White Paper <a href="#s10">[1]</a> · Configure Route Control in ACI <a href="#s10">[4]</a></div>
+      </div>
+    </div>
+
+    <div class="vc no">
+      <div class="vc-h">
+        <div class="vc-n">5</div>
+        <div class="vc-q">OSPF cost가 MP-BGP redistribute 시 BGP MED로 자동 상속된다</div>
+        <div class="tag-verdict tag-no">정정 — 아니오</div>
+      </div>
+      <div class="vc-b">
+        <strong>자동 상속되지 않는다.</strong> interleak redistribution 시 metric/preference/community는 Route Profile의 Set Rule로 <strong>명시적으로 설정해야</strong> 적용된다. (1차 답변의 "MED는 OSPF cost를 상속" 서술을 정정.)
+        <div class="src">출처: APIC L3 Networking Config Guide 6.2(x) — Route Control with Route Maps and Route Profiles <a href="#s10">[5]</a></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="callout tip">
+    <div class="ico">∑</div>
+    <div class="body">
+      <div class="lbl">종합</div>
+      <p>1차 답변의 <strong>핵심 결론(Route Map Set Rule · Import 방향 · MED보다 Local Pref 우선)은 모두 공식 문서로 검증됨</strong>. 보조 설명 1건("OSPF cost→MED 자동 상속")만 틀렸고 정정 완료. 정정 내용은 오히려 "명시적 Set 필요"라는 핵심 권고를 더 강화한다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="s9">
+  <h2 class="sec"><span class="idx">09</span> 구성 체크리스트</h2>
+  <div class="sec-rule"></div>
+  <p>클릭하여 진행 상황을 체크하세요.</p>
+  <ul class="check">
+    <li><span class="box">✓</span><span class="tx">조정 대상 external prefix를 식별했다 (특정 subnet 또는 <code class="inl">0.0.0.0/0</code>)</span></li>
+    <li><span class="box">✓</span><span class="tx">Match Rule for Route Map 생성 + Match Prefix 추가</span></li>
+    <li><span class="box">✓</span><span class="tx">Set Rule 생성 + <strong>Set Preference</strong>(Local Pref) 값 지정 (MED 단독 의존 지양)</span></li>
+    <li><span class="box">✓</span><span class="tx">L3Out Route Map(Type=Route Control) 생성, Context = Permit + Match + Set</span></li>
+    <li><span class="box">✓</span><span class="tx"><strong>Direction = Import</strong> 설정 (외부→내부 수신 경로 제어)</span></li>
+    <li><span class="box">✓</span><span class="tx">External EPG Subnet 에 Import Route Control 활성화 + Route Map 연결</span></li>
+    <li><span class="box">✓</span><span class="tx">"내부 선호도"를 Interface OSPF Cost로 바꾸려 하지 않았는지 재확인 (그건 외부 SPF용)</span></li>
+    <li><span class="box">✓</span><span class="tx">compute Leaf에서 <code class="inl">show ip bgp vpnv4 vrf …</code> 로 Local Pref/best-path 검증</span></li>
+  </ul>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="s10">
+  <h2 class="sec"><span class="idx">10</span> 참고 문서 (Cisco 공식)</h2>
+  <div class="sec-rule"></div>
+  <p>본 문서 검증에 사용된 Cisco 공식 출처. ciscodata(Cisco 내부 RAG)가 반환한 인용 링크다.</p>
+
+  <ul class="refs">
+    <li>
+      <div class="rn">[1]</div>
+      <div class="rc">
+        <div class="rt">Cisco ACI Fabric L3Out White Paper</div>
+        <div class="ru"><a href="https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/guide-c07-743150.html" target="_blank" rel="noopener">cisco.com › …/application-centric-infrastructure/guide-c07-743150.html</a></div>
+      </div>
+    </li>
+    <li>
+      <div class="rn">[2]</div>
+      <div class="rc">
+        <div class="rt">APIC Layer 3 Networking Configuration Guide, Release 6.2(x) — WAN and Other External Network Forwarding</div>
+        <div class="ru"><a href="https://www.cisco.com/c/en/us/td/docs/dcn/aci/apic/6x/l3-configuration/cisco-apic-layer-3-networking-configuration-guide-62x/wan-and-other-external-net-forwarding-layer3-config-62x.html" target="_blank" rel="noopener">cisco.com › …/wan-and-other-external-net-forwarding-layer3-config-62x.html</a></div>
+      </div>
+    </li>
+    <li>
+      <div class="rn">[4]</div>
+      <div class="rc">
+        <div class="rt">Configure Route Control in ACI (TechZone / Support Doc 220710)</div>
+        <div class="ru"><a href="https://www.cisco.com/c/en/us/support/docs/cloud-systems-management/application-centric-infrastructure-simulator/220710-configure-route-control-in-aci.html" target="_blank" rel="noopener">cisco.com › …/220710-configure-route-control-in-aci.html</a></div>
+      </div>
+    </li>
+    <li>
+      <div class="rn">[5]</div>
+      <div class="rc">
+        <div class="rt">APIC Layer 3 Networking Configuration Guide, Release 6.2(x) — Route Control with Route Maps and Route Profiles</div>
+        <div class="ru"><a href="https://www.cisco.com/c/en/us/td/docs/switches/datacenter/aci/apic/sw/6x/l3-configuration/cisco-apic-layer-3-networking-configuration-guide-62x/route-control-layer3-config-62x.html" target="_blank" rel="noopener">cisco.com › …/route-control-layer3-config-62x.html</a></div>
+      </div>
+    </li>
+  </ul>
+</section>
+
+  </div><!--/content-->
+
+  <footer>
+    <div class="disc">본 문서는 Cisco 공식 문서(White Paper, APIC L3 Networking Configuration Guide 6.2(x), TechZone)를 기반으로 작성·교차검증되었습니다. 버전별 동작·GUI 경로·스케일은 배포 대상 릴리스의 최신 Cisco 공식 문서로 반드시 재확인하십시오. Cisco 내부 지식 소스(Circuit / ciscodata) 검증 기준.</div>
+    <div>ACI L3Out OSPF · 외부 경로 Cost/Metric 조정 가이드 · 네트워크 엔지니어용 · 기준 릴리스 APIC 6.2(x)</div>
+  </footer>
+</main>
+</div>
+
+<div id="toTop" title="맨 위로">↑</div>
+
+<script>
+const links=[...document.querySelectorAll('nav.toc a')];
+const secIds=links.map(a=>a.getAttribute('href').slice(1));
+const prog=document.getElementById('progress');
+const toTop=document.getElementById('toTop');
+function onScroll(){
+  const h=document.documentElement;
+  const sc=h.scrollTop, max=h.scrollHeight-h.clientHeight;
+  prog.style.width=(max>0?(sc/max*100):0)+'%';
+  toTop.classList.toggle('show',sc>500);
+  let cur=secIds[0];
+  for(const id of secIds){const el=document.getElementById(id); if(el && el.getBoundingClientRect().top<=120) cur=id;}
+  links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+cur));
+}
+document.addEventListener('scroll',onScroll,{passive:true});
+window.addEventListener('load',onScroll);
+toTop.onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
+
+function bindCopy(){
+  document.querySelectorAll('.code .copy').forEach(b=>{
+    if(b.dataset.bound)return; b.dataset.bound=1;
+    b.onclick=()=>{
+      const pre=b.closest('.code').querySelector('pre');
+      navigator.clipboard.writeText(pre.innerText).then(()=>{
+        const t=b.textContent; b.textContent='✓ 복사됨'; b.classList.add('done');
+        setTimeout(()=>{b.textContent=t;b.classList.remove('done')},1400);
+      });
+    };
+  });
+}
+
+const themeBtn=document.getElementById('themeBtn'), themeLbl=document.getElementById('themeLbl');
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);
+  themeBtn.firstChild.textContent=(t==='light'?'☀️ ':'🌙 ');themeLbl.textContent=(t==='light'?'Light':'Dark');
+  try{localStorage.setItem('l3ospf-theme',t)}catch(e){}}
+themeBtn.onclick=()=>setTheme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light');
+try{setTheme(localStorage.getItem('l3ospf-theme')||'dark')}catch(e){setTheme('dark')}
+
+const sb=document.getElementById('sidebar'),scrim=document.getElementById('scrim'),menuBtn=document.getElementById('menuBtn');
+function closeM(){sb.classList.remove('open');scrim.classList.remove('show')}
+menuBtn.onclick=()=>{sb.classList.toggle('open');scrim.classList.toggle('show')};
+scrim.onclick=closeM;
+document.querySelectorAll('nav.toc a').forEach(a=>a.addEventListener('click',closeM));
+
+function bindChecks(){document.querySelectorAll('.check li').forEach(li=>{
+  if(li.dataset.b)return; li.dataset.b=1;
+  li.onclick=()=>li.classList.toggle('done');
+});}
+
+const si=document.getElementById('searchInput');
+if(si){si.addEventListener('input',()=>{
+  const q=si.value.trim().toLowerCase();
+  document.querySelectorAll('main section').forEach(sec=>{
+    if(!q){sec.style.display='';return;}
+    sec.style.display=sec.innerText.toLowerCase().includes(q)?'':'none';
+  });
+});}
+
+window.addEventListener('DOMContentLoaded',()=>{bindCopy();bindChecks();});
+</script>
+</body>
+</html>

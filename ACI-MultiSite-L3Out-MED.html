@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ACI Multi-Site L3Out · MED/OSPF Cost Suboptimal Egress 트러블슈팅 (실측 기반)</title>
+<style>
+  :root{
+    --bg:#0a0e17; --bg-2:#0f1521; --panel:#121a28; --panel-2:#16202f;
+    --border:#243044; --border-2:#2e3c54;
+    --txt:#dce3ee; --txt-dim:#9fb0c6; --txt-faint:#6c7d96;
+    --accent:#16c7c1; --accent-2:#1ba0e2; --accent-3:#6f6cf6;
+    --ok:#22c98a; --warn:#f5b942; --danger:#f0556b; --info:#3aa0ff; --tip:#28d3a0;
+    --code-bg:#0b111c; --code-border:#1f2c40;
+    --shadow:0 10px 40px rgba(0,0,0,.45);
+    --mono:"SF Mono", "JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo",Roboto,"Noto Sans KR",sans-serif;
+    --sidebar-w:312px;
+  }
+  html[data-theme="light"]{
+    --bg:#eef2f7; --bg-2:#e6ecf3; --panel:#ffffff; --panel-2:#f5f8fc;
+    --border:#d4dde8; --border-2:#c2cfde;
+    --txt:#15212f; --txt-dim:#41546b; --txt-faint:#71839a;
+    --code-bg:#0b111c; --code-border:#1f2c40;
+    --shadow:0 8px 30px rgba(40,60,90,.12);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(240,85,107,.10), transparent 60%),
+      radial-gradient(1000px 500px at -10% 10%, rgba(27,160,226,.10), transparent 55%),
+      var(--bg);
+    color:var(--txt); font-family:var(--sans); font-size:16px; line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:60;
+    background:linear-gradient(90deg,var(--danger),var(--warn),var(--accent));
+    box-shadow:0 0 12px rgba(245,185,66,.6);transition:width .1s ease-out}
+
+  .wrap{display:flex;max-width:1500px;margin:0 auto;gap:0}
+  .sidebar{
+    width:var(--sidebar-w);flex:0 0 var(--sidebar-w);position:sticky;top:0;height:100vh;
+    overflow-y:auto;padding:26px 18px 60px;border-right:1px solid var(--border);
+    background:linear-gradient(180deg,var(--bg-2),var(--bg));backdrop-filter:blur(6px);
+  }
+  .sidebar::-webkit-scrollbar{width:8px}
+  .sidebar::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:8px}
+  .brand{display:flex;align-items:center;gap:11px;margin-bottom:6px}
+  .brand .logo{width:40px;height:40px;border-radius:11px;flex:0 0 40px;
+    background:linear-gradient(135deg,var(--danger),var(--warn));
+    display:grid;place-items:center;font-weight:800;color:#1a0708;font-size:13px;
+    box-shadow:0 6px 18px rgba(240,85,107,.35)}
+  .brand h1{font-size:14.5px;margin:0;line-height:1.25;font-weight:750;letter-spacing:.2px}
+  .brand .sub{font-size:11px;color:var(--txt-faint);margin-top:2px}
+  .side-meta{font-size:11px;color:var(--txt-faint);margin:14px 0 14px;padding:11px 13px;
+    border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+  .side-meta b{color:var(--accent)}
+  .verify-badge{display:flex;align-items:center;gap:9px;margin:12px 0 8px;padding:11px 13px;
+    border:1px solid rgba(34,201,138,.35);border-radius:10px;
+    background:linear-gradient(100deg,rgba(34,201,138,.13),transparent 80%)}
+  .verify-badge .vi{width:26px;height:26px;flex:0 0 26px;border-radius:8px;display:grid;place-items:center;
+    background:rgba(34,201,138,.18);color:var(--ok);font-size:15px;font-weight:800}
+  .verify-badge .vt{font-size:11px;line-height:1.4}
+  .verify-badge .vt b{color:var(--ok);font-weight:750}
+  .toc-title{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;
+    color:var(--txt-faint);margin:18px 6px 8px;font-weight:700}
+  nav.toc a{
+    display:flex;align-items:center;gap:9px;padding:7px 11px;margin:2px 0;border-radius:8px;
+    color:var(--txt-dim);text-decoration:none;font-size:13.5px;font-weight:500;
+    border:1px solid transparent;transition:.15s;position:relative
+  }
+  nav.toc a .num{font-variant-numeric:tabular-nums;font-size:11px;color:var(--txt-faint);
+    width:20px;flex:0 0 20px;text-align:right;font-family:var(--mono)}
+  nav.toc a:hover{background:var(--panel);color:var(--txt);border-color:var(--border)}
+  nav.toc a.active{background:linear-gradient(90deg,rgba(245,185,66,.16),rgba(27,160,226,.06));
+    color:#fff;border-color:var(--border-2)}
+  nav.toc a.active .num{color:var(--warn)}
+  nav.toc a.active::before{content:"";position:absolute;left:-1px;top:8px;bottom:8px;width:3px;
+    border-radius:3px;background:linear-gradient(var(--danger),var(--warn))}
+
+  main{flex:1 1 auto;min-width:0;padding:0 0 120px}
+  .topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:12px 30px;border-bottom:1px solid var(--border);
+    background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(10px)}
+  .topbar .crumb{font-size:12.5px;color:var(--txt-faint);flex:1 1 auto}
+  .topbar .crumb b{color:var(--txt-dim)}
+  .btn{display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1px solid var(--border);
+    background:var(--panel);color:var(--txt-dim);border-radius:9px;padding:7px 12px;font-size:12.5px;
+    font-weight:600;transition:.15s;font-family:inherit}
+  .btn:hover{color:var(--txt);border-color:var(--border-2);background:var(--panel-2)}
+  .search{display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--panel);
+    border-radius:9px;padding:6px 11px;min-width:200px}
+  .search input{background:transparent;border:0;outline:0;color:var(--txt);font-size:13px;width:100%;font-family:inherit}
+  .search svg{flex:0 0 14px;opacity:.6}
+
+  .content{max-width:980px;margin:0 auto;padding:0 30px}
+
+  .hero{margin:40px 0 30px;padding:38px 34px;border-radius:20px;position:relative;overflow:hidden;
+    border:1px solid var(--border);
+    background:
+      radial-gradient(700px 240px at 90% -30%, rgba(240,85,107,.20), transparent 60%),
+      radial-gradient(600px 240px at 0% 120%, rgba(27,160,226,.18), transparent 55%),
+      linear-gradient(160deg,var(--panel-2),var(--panel))}
+  .hero::after{content:"";position:absolute;inset:0;
+    background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:34px 34px;opacity:.10;mask-image:radial-gradient(600px 300px at 80% 0%,#000,transparent)}
+  .hero .eyebrow{position:relative;z-index:1;display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;
+    letter-spacing:1.5px;text-transform:uppercase;color:var(--warn);
+    border:1px solid var(--border-2);border-radius:999px;padding:5px 13px;background:rgba(245,185,66,.07)}
+  .hero h2{position:relative;z-index:1;font-size:36px;line-height:1.15;margin:18px 0 10px;font-weight:800;letter-spacing:-.5px}
+  .hero h2 .grad{background:linear-gradient(100deg,var(--warn),var(--danger) 55%,var(--accent-3));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lead{position:relative;z-index:1;color:var(--txt-dim);font-size:16px;max-width:710px;margin:0 0 20px}
+  .hero .chips{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:9px}
+  .chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--txt-dim);
+    border:1px solid var(--border);background:var(--panel);border-radius:999px;padding:6px 13px}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--warn)}
+  .chip.v .dot{background:var(--accent-2)} .chip.a .dot{background:var(--danger)} .chip.u .dot{background:var(--accent)}
+
+  .meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:22px 0 8px}
+  .meta-card{border:1px solid var(--border);border-radius:14px;padding:16px 18px;background:var(--panel);
+    position:relative;overflow:hidden}
+  .meta-card .k{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--txt-faint);font-weight:700}
+  .meta-card .v{font-size:15px;color:var(--txt);margin-top:6px;font-weight:650}
+  .meta-card .v small{color:var(--txt-dim);font-weight:500}
+  .meta-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:linear-gradient(var(--warn),var(--danger))}
+
+  section{scroll-margin-top:70px;margin:54px 0}
+  section > h2.sec{font-size:26px;font-weight:780;letter-spacing:-.3px;margin:0 0 6px;display:flex;align-items:center;gap:14px}
+  section > h2.sec .idx{font-family:var(--mono);font-size:15px;font-weight:700;color:#1a0708;
+    background:linear-gradient(135deg,var(--warn),var(--danger));border-radius:9px;
+    min-width:34px;height:34px;display:grid;place-items:center;flex:0 0 auto;box-shadow:0 4px 14px rgba(245,185,66,.3)}
+  .sec-rule{height:1px;background:linear-gradient(90deg,var(--border-2),transparent);margin:14px 0 22px}
+  h3.sub{font-size:18.5px;font-weight:700;margin:30px 0 10px;color:var(--txt);
+    padding-left:13px;border-left:3px solid var(--warn);line-height:1.3}
+  h4.subsub{font-size:15px;font-weight:700;margin:22px 0 8px;color:var(--accent-2)}
+  p{margin:12px 0}
+  a{color:var(--accent-2);text-decoration:none;border-bottom:1px dashed transparent}
+  a:hover{border-bottom-color:var(--accent-2)}
+  strong{color:#fff;font-weight:700}
+  html[data-theme="light"] strong{color:#0a1622}
+  em{color:var(--txt-dim);font-style:italic}
+  ul,ol{margin:12px 0;padding-left:22px}
+  li{margin:7px 0}
+  li::marker{color:var(--warn)}
+
+  code.inl{font-family:var(--mono);font-size:.86em;background:var(--code-bg);color:#7fe9d8;
+    border:1px solid var(--code-border);border-radius:6px;padding:1.5px 6px;white-space:nowrap}
+
+  .code{position:relative;margin:18px 0;border:1px solid var(--code-border);border-radius:13px;overflow:hidden;
+    background:var(--code-bg);box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)}
+  .code .bar{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--code-border);
+    background:linear-gradient(180deg,#0e1726,#0a111d)}
+  .code .bar .dots{display:flex;gap:6px;margin-right:6px}
+  .code .bar .dots i{width:11px;height:11px;border-radius:50%;display:block}
+  .code .bar .dots i:nth-child(1){background:#ff5f57} .code .bar .dots i:nth-child(2){background:#febc2e} .code .bar .dots i:nth-child(3){background:#28c840}
+  .code .bar .lang{font-family:var(--mono);font-size:11px;letter-spacing:.5px;color:var(--txt-faint);
+    text-transform:uppercase;font-weight:700}
+  .code .bar .copy{margin-left:auto;cursor:pointer;border:1px solid var(--code-border);background:#0c1320;
+    color:var(--txt-dim);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;font-family:var(--sans);transition:.15s}
+  .code .bar .copy:hover{color:#fff;border-color:var(--border-2)}
+  .code .bar .copy.done{color:var(--ok);border-color:var(--ok)}
+  .code pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.65;color:#cdd9ea}
+  .code pre::-webkit-scrollbar{height:9px} .code pre::-webkit-scrollbar-thumb{background:#243044;border-radius:8px}
+  .diagram pre{color:#8fd4ff;font-size:12.5px;line-height:1.55;letter-spacing:0}
+  .t-tag{color:#6f9bff} .t-attr{color:#7fe9d8} .t-str{color:#f5b97a} .t-cmt{color:#5c7088;font-style:italic}
+  .t-kw{color:#c98bdb} .t-num{color:#8fe0a0} .t-prompt{color:#22c98a} .t-hi{color:#ffd479;font-weight:700} .t-bad{color:#ff8a9b;font-weight:700} .t-good{color:#5fe3b0;font-weight:700}
+
+  .tbl-wrap{margin:18px 0;border:1px solid var(--border);border-radius:13px;overflow:auto;box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+  thead th{background:linear-gradient(180deg,var(--panel-2),var(--panel));color:var(--txt);
+    text-align:left;font-weight:700;padding:12px 15px;border-bottom:1px solid var(--border-2);
+    position:sticky;top:0;white-space:nowrap;font-size:12.5px;letter-spacing:.2px}
+  tbody td{padding:11px 15px;border-bottom:1px solid var(--border);color:var(--txt-dim);vertical-align:top}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:nth-child(even){background:rgba(255,255,255,.015)}
+  tbody tr:hover{background:rgba(245,185,66,.05)}
+  td strong,th strong{color:#fff}
+  html[data-theme="light"] td strong{color:#0a1622}
+  .center{text-align:center}
+  .ver{font-family:var(--mono);font-weight:700;color:var(--accent);font-size:12.5px;white-space:nowrap}
+  .yes{color:var(--ok);font-weight:700} .no{color:var(--danger);font-weight:700} .part{color:var(--warn);font-weight:700}
+  td.num,th.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .hot-cell{background:rgba(245,185,66,.13)!important;color:#ffd479!important;font-weight:700;font-family:var(--mono)}
+  .win-cell{background:rgba(34,201,138,.13)!important;color:#5fe3b0!important;font-weight:700}
+
+  .callout{display:flex;gap:14px;margin:18px 0;padding:15px 18px;border-radius:13px;border:1px solid var(--border);
+    background:var(--panel);position:relative;overflow:hidden}
+  .callout::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .callout .ico{flex:0 0 26px;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:15px;font-weight:800}
+  .callout .body{flex:1;min-width:0}
+  .callout .body p{margin:4px 0}
+  .callout .lbl{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+  .callout.note{background:linear-gradient(100deg,rgba(58,160,255,.10),transparent 70%)}
+  .callout.note::before{background:var(--info)} .callout.note .ico{background:rgba(58,160,255,.16);color:var(--info)} .callout.note .lbl{color:var(--info)}
+  .callout.tip{background:linear-gradient(100deg,rgba(40,211,160,.10),transparent 70%)}
+  .callout.tip::before{background:var(--tip)} .callout.tip .ico{background:rgba(40,211,160,.16);color:var(--tip)} .callout.tip .lbl{color:var(--tip)}
+  .callout.warn{background:linear-gradient(100deg,rgba(245,185,66,.10),transparent 70%)}
+  .callout.warn::before{background:var(--warn)} .callout.warn .ico{background:rgba(245,185,66,.16);color:var(--warn)} .callout.warn .lbl{color:var(--warn)}
+  .callout.danger{background:linear-gradient(100deg,rgba(240,85,107,.10),transparent 70%)}
+  .callout.danger::before{background:var(--danger)} .callout.danger .ico{background:rgba(240,85,107,.16);color:var(--danger)} .callout.danger .lbl{color:var(--danger)}
+
+  /* formula box */
+  .formula{margin:18px 0;padding:20px 22px;border:1px solid var(--border-2);border-radius:14px;
+    background:linear-gradient(160deg,rgba(245,185,66,.07),var(--panel));text-align:center;font-family:var(--mono)}
+  .formula .eq{font-size:16px;color:#fff;font-weight:700;line-height:2}
+  html[data-theme="light"] .formula .eq{color:#0a1622}
+  .formula .eq .h1{color:var(--accent)} .formula .eq .h2{color:var(--warn)} .formula .eq .h3{color:var(--danger)}
+  .formula .sub{font-size:12px;color:var(--txt-faint);margin-top:10px;font-family:var(--sans)}
+
+  /* flow / vantage */
+  .flow{display:flex;flex-direction:column;align-items:center;gap:0;margin:20px 0}
+  .flow .node{border:1px solid var(--border-2);border-radius:12px;padding:13px 20px;background:var(--panel);
+    text-align:center;min-width:300px;max-width:560px;position:relative}
+  .flow .node .nt{font-weight:750;color:#fff;font-size:14px}
+  html[data-theme="light"] .flow .node .nt{color:#0a1622}
+  .flow .node .nd{font-size:12px;color:var(--txt-dim);margin-top:3px}
+  .flow .node.hot{border-color:var(--warn);background:linear-gradient(160deg,rgba(245,185,66,.12),var(--panel));
+    box-shadow:0 0 0 1px rgba(245,185,66,.25),0 8px 24px rgba(245,185,66,.12)}
+  .flow .node.hot .nt{color:var(--warn)}
+  .flow .arrow{color:var(--accent-2);font-size:20px;line-height:1;padding:7px 0;font-weight:700}
+  .flow .arrow small{display:block;font-size:10.5px;color:var(--txt-faint);font-weight:600;letter-spacing:.3px;margin-top:2px;font-family:var(--mono)}
+
+  /* best-path ladder */
+  .ladder{list-style:none;padding:0;margin:18px 0;counter-reset:bp}
+  .ladder li{counter-increment:bp;display:flex;align-items:center;gap:13px;padding:11px 15px;margin:6px 0;
+    border:1px solid var(--border);border-radius:11px;background:var(--panel);font-size:13.5px;position:relative}
+  .ladder li::before{content:counter(bp);font-family:var(--mono);font-weight:800;font-size:12px;width:26px;height:26px;flex:0 0 26px;
+    border-radius:7px;display:grid;place-items:center;background:var(--panel-2);border:1px solid var(--border-2);color:var(--txt-faint)}
+  .ladder li .bp-name{font-weight:700;color:var(--txt);min-width:150px}
+  .ladder li .bp-desc{color:var(--txt-dim);font-size:12.5px;flex:1}
+  .ladder li.decide{border-color:var(--danger);background:linear-gradient(100deg,rgba(240,85,107,.12),var(--panel))}
+  .ladder li.decide::before{background:var(--danger);color:#1a0708;border-color:var(--danger)}
+  .ladder li.decide .bp-name{color:#ff8a9b}
+  .ladder li.fix{border-color:var(--ok);background:linear-gradient(100deg,rgba(34,201,138,.12),var(--panel))}
+  .ladder li.fix::before{background:var(--ok);color:#04121a;border-color:var(--ok)}
+  .ladder li.fix .bp-name{color:#5fe3b0}
+  .ladder li .tagm{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px;letter-spacing:.5px}
+  .tagm.d{background:rgba(240,85,107,.18);color:var(--danger)} .tagm.f{background:rgba(34,201,138,.18);color:var(--ok)}
+
+  /* steps */
+  .steps{counter-reset:st;margin:18px 0;padding:0;list-style:none}
+  .steps>li{counter-increment:st;position:relative;padding:4px 0 18px 46px;margin:0}
+  .steps>li::before{content:counter(st);position:absolute;left:0;top:0;width:30px;height:30px;border-radius:9px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04121a;font-weight:800;font-size:14px;
+    display:grid;place-items:center;box-shadow:0 4px 12px rgba(22,199,193,.3)}
+  .steps>li::after{content:"";position:absolute;left:14px;top:32px;bottom:2px;width:2px;background:var(--border)}
+  .steps>li:last-child::after{display:none}
+  .steps>li .stt{font-weight:700;color:#fff;font-size:14.5px}
+  html[data-theme="light"] .steps>li .stt{color:#0a1622}
+  .steps>li .loc{font-size:11.5px;color:var(--accent-2);font-family:var(--mono);margin:4px 0}
+  .steps>li ul{margin:8px 0}
+
+  /* checklist */
+  .check{list-style:none;padding:0;margin:18px 0;display:grid;gap:8px}
+  .check li{display:flex;gap:11px;align-items:flex-start;padding:11px 14px;border:1px solid var(--border);
+    border-radius:10px;background:var(--panel);font-size:13.5px;color:var(--txt-dim);cursor:pointer;transition:.15s}
+  .check li:hover{border-color:var(--border-2);background:var(--panel-2)}
+  .check li .box{flex:0 0 19px;width:19px;height:19px;border-radius:6px;border:2px solid var(--border-2);
+    display:grid;place-items:center;margin-top:1px;transition:.15s;font-size:12px;color:transparent}
+  .check li.done .box{background:var(--ok);border-color:var(--ok);color:#04121a}
+  .check li.done{color:var(--txt-faint)}
+  .check li.done span.tx{text-decoration:line-through}
+
+  /* correction (myth vs fact) */
+  .myth{display:grid;gap:12px;margin:18px 0}
+  .myth .row{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .myth .row > div{padding:13px 16px;font-size:13px}
+  .myth .row .m{background:linear-gradient(100deg,rgba(240,85,107,.09),transparent);border-right:1px solid var(--border)}
+  .myth .row .f{background:linear-gradient(100deg,rgba(34,201,138,.09),transparent)}
+  .myth .row .lbl{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;margin-bottom:5px}
+  .myth .row .m .lbl{color:var(--danger)} .myth .row .f .lbl{color:var(--ok)}
+  @media(max-width:640px){.myth .row{grid-template-columns:1fr}.myth .row .m{border-right:0;border-bottom:1px solid var(--border)}}
+
+  .refs{list-style:none;padding:0;margin:18px 0;display:grid;gap:10px}
+  .refs li{display:flex;gap:13px;align-items:flex-start;padding:13px 16px;border:1px solid var(--border);
+    border-radius:12px;background:var(--panel);transition:.15s}
+  .refs li:hover{border-color:var(--border-2);background:var(--panel-2)}
+  .refs li .rn{font-family:var(--mono);font-size:12px;font-weight:800;color:var(--warn);flex:0 0 26px}
+  .refs li .rc{flex:1;min-width:0}
+  .refs li .rc .rt{font-weight:650;color:var(--txt);font-size:13.5px;margin-bottom:3px}
+  .refs li .rc .ru{font-size:11.5px;word-break:break-all}
+
+  footer{max-width:980px;margin:60px auto 0;padding:26px 30px;border-top:1px solid var(--border);
+    color:var(--txt-faint);font-size:12.5px}
+  footer .disc{padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--panel);
+    color:var(--txt-dim);margin-bottom:16px}
+
+  #toTop{position:fixed;right:24px;bottom:24px;z-index:50;width:46px;height:46px;border-radius:13px;cursor:pointer;
+    border:1px solid var(--border-2);background:var(--panel);color:var(--warn);display:grid;place-items:center;
+    box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.25s;font-size:18px}
+  #toTop.show{opacity:1;pointer-events:auto}
+  #toTop:hover{background:var(--panel-2);transform:translateY(-3px)}
+
+  .mobile-toggle{display:none}
+  @media(max-width:1080px){
+    .sidebar{position:fixed;left:0;top:0;z-index:70;transform:translateX(-100%);transition:transform .25s;box-shadow:var(--shadow)}
+    .sidebar.open{transform:translateX(0)}
+    .mobile-toggle{display:inline-flex}
+    .hero h2{font-size:28px}
+    .search{min-width:auto}
+  }
+  @media(max-width:680px){
+    .content,.topbar{padding-left:16px;padding-right:16px}
+    .hero{padding:26px 20px} .hero h2{font-size:23px}
+    section>h2.sec{font-size:20px}
+    .topbar .crumb{display:none}
+    .search input{width:110px}
+    .ladder li{flex-wrap:wrap}.ladder li .bp-name{min-width:auto}
+  }
+  #scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:65;opacity:0;pointer-events:none;transition:.25s}
+  #scrim.show{opacity:1;pointer-events:auto}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="scrim"></div>
+<div class="wrap">
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="logo">MS</div>
+    <div>
+      <h1>Multi-Site L3Out MED 트러블슈팅</h1>
+      <div class="sub">OSPF Cost → MED → Suboptimal Egress</div>
+    </div>
+  </div>
+  <div class="side-meta">
+    <div>유형 · <b>실측 기반 분석 (Field Data)</b></div>
+    <div style="margin-top:5px">구성 · Multi-Site · 단일 stretched VRF</div>
+  </div>
+  <div class="verify-badge">
+    <div class="vi">✓</div>
+    <div class="vt"><b>2개 Cisco 소스 교차검증</b><br>ciscoDeepNetwork(ACI) + ciscodata(공식 RAG)<br>+ 실측 데이터 일치 확인</div>
+  </div>
+  <div class="toc-title">목차 · Contents</div>
+  <nav class="toc" id="toc">
+    <a href="#s1"><span class="num">01</span> 증상 &amp; 실측 데이터</a>
+    <a href="#s2"><span class="num">02</span> OSPF Cost → MED 매핑</a>
+    <a href="#s3"><span class="num">03</span> MED는 Site간 보존</a>
+    <a href="#s4"><span class="num">04</span> 왜 Suboptimal 발생</a>
+    <a href="#s5"><span class="num">05</span> Best-Path 결정 흐름</a>
+    <a href="#s6"><span class="num">06</span> 해결책 · Local Pref</a>
+    <a href="#s7"><span class="num">07</span> 설정 절차</a>
+    <a href="#s8"><span class="num">08</span> 진단 명령어</a>
+    <a href="#s9"><span class="num">09</span> 오해 정정 (Myth)</a>
+    <a href="#s10"><span class="num">10</span> 체크리스트</a>
+    <a href="#s11"><span class="num">11</span> 참고 문서</a>
+  </nav>
+</aside>
+
+<main>
+  <div class="topbar">
+    <button class="btn mobile-toggle" id="menuBtn" aria-label="menu">☰</button>
+    <div class="crumb"><b>Cisco ACI Multi-Site</b> &nbsp;›&nbsp; L3Out · OSPF &nbsp;›&nbsp; MED / Egress 경로</div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="searchInput" type="text" placeholder="문서 내 검색…" />
+    </div>
+    <button class="btn" id="themeBtn" title="테마 전환">🌙 <span id="themeLbl">Dark</span></button>
+  </div>
+
+  <div class="content" id="content">
+
+    <div class="hero">
+      <span class="eyebrow">◆ ACI Multi-Site · Field Troubleshooting</span>
+      <h2>OSPF Cost가 <span class="grad">MED로 반영</span>되어 발생하는<br>Suboptimal Egress</h2>
+      <p class="lead">Multi-Site 단일 stretched VRF에서 동일 외부 prefix를 양 site L3Out으로 받을 때, OSPF cost가 MP-BGP MED로 상속되고 site간 EVPN으로 보존되어, 양 site 모두 cost 낮은 한쪽 L3Out으로만 나가는 현상. 실측 데이터로 메커니즘을 규명하고 Local Preference로 해결한다.</p>
+      <div class="chips">
+        <span class="chip"><span class="dot"></span> OSPF Cost → BGP MED 상속</span>
+        <span class="chip v"><span class="dot"></span> MED 4 EVPN 보존 (transitive)</span>
+        <span class="chip a"><span class="dot"></span> Suboptimal Egress / Tromboning</span>
+        <span class="chip u"><span class="dot"></span> Fix · Set Local Preference 200</span>
+      </div>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-card"><div class="k">근본 원인</div><div class="v">MED = OSPF cost <small>+ BL cost</small></div></div>
+      <div class="meta-card"><div class="k">결정 속성</div><div class="v">BGP MED <small>(낮은 쪽 승)</small></div></div>
+      <div class="meta-card"><div class="k">잘못된 해법</div><div class="v">OSPF Cost 조정 <small>(취약)</small></div></div>
+      <div class="meta-card"><div class="k">올바른 해법</div><div class="v">Local Preference 200</div></div>
+    </div>
+
+    <div class="callout danger">
+      <div class="ico">!</div>
+      <div class="body">
+        <div class="lbl">이 문서의 핵심 반전</div>
+        <p>일반적으로 "ACI는 OSPF cost를 MED로 반영하지 않는다"고 알려져 있으나, <strong>실측 데이터는 그 반대</strong>를 보여준다. 이 환경에서는 <strong>OSPF cost가 MED로 상속되고 site간 EVPN으로 보존</strong>되어 best-path를 결정한다. 따라서 OSPF cost 조정이 아니라 <strong>Local Preference</strong>가 정답이다. (상세 정정: <a href="#s9">§9</a>)</p>
+      </div>
+    </div>
+
+<!-- ============ 1 ============ -->
+<section id="s1">
+  <h2 class="sec"><span class="idx">01</span> 증상 &amp; 실측 데이터</h2>
+  <div class="sec-rule"></div>
+
+  <h3 class="sub">1.1 증상</h3>
+  <p>Multi-Site로 연결된 두 site(Site1, Site2)가 <strong>단일 stretched VRF</strong>를 공유하고, 동일한 외부 네트워크 <strong>A</strong>를 각 site의 local L3Out에서 OSPF로 수신한다. 그런데 <strong>양 site의 endpoint가 모두 Site1-L3Out으로만 외부로 나가</strong>, Site2의 트래픽이 ISN을 건너 Site1으로 우회(tromboning)하는 suboptimal egress가 발생한다.</p>
+
+  <h3 class="sub">1.2 실측 데이터</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>경로</th>
+        <th class="num">① Core OSPF Cost</th>
+        <th class="num">② Border Leaf 가산 Cost</th>
+        <th class="num">③ MP-BGP MED (①+②)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Site1-L3Out / A</strong></td>
+        <td class="num">48</td>
+        <td class="num">+11</td>
+        <td class="hot-cell">59 ← 더 낮음</td>
+      </tr>
+      <tr>
+        <td><strong>Site2-L3Out / A</strong></td>
+        <td class="num">58</td>
+        <td class="num">+4</td>
+        <td class="num">62</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr><th>관측 지점</th><th>Site1-L3Out MED</th><th>Site2-L3Out MED</th><th>RIB 설치 경로 (best)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Site1 ACI Leaf</strong></td><td class="num">59</td><td class="num">62</td><td class="win-cell">Site1-L3Out</td></tr>
+      <tr><td><strong>Site2 ACI Leaf</strong></td><td class="num">59</td><td class="num">62</td><td class="win-cell">Site1-L3Out ⚠️</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ico">◎</div>
+    <div class="body">
+      <div class="lbl">데이터에서 읽히는 3가지 사실</div>
+      <p><strong>①</strong> OSPF cost 순서(48 &lt; 58)가 MED 순서(59 &lt; 62)로 <strong>그대로 보존</strong> → OSPF cost가 MED에 반영됨.</p>
+      <p><strong>②</strong> 양 site leaf가 <strong>동일한 MED(59/62)</strong>를 봄 → MED가 site간 EVPN을 건너 보존됨.</p>
+      <p><strong>③</strong> 양 site 모두 MED 낮은 <strong>Site1-L3Out(59)을 선택</strong> → MED가 실제 결정자이며, Site2는 suboptimal.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="s2">
+  <h2 class="sec"><span class="idx">02</span> OSPF Cost → BGP MED 매핑</h2>
+  <div class="sec-rule"></div>
+
+  <p>ACI Border Leaf가 OSPF external route를 fabric MP-BGP(VPNv4)로 redistribute(interleak)할 때, <strong>OSPF total cost가 BGP MED로 상속</strong>된다. MED 값은 다음 공식으로 형성된다.</p>
+
+  <div class="formula">
+    <div class="eq"><span class="h3">MED</span> &nbsp;=&nbsp; <span class="h1">Core가 광고한 OSPF Cost</span> &nbsp;+&nbsp; <span class="h2">Border Leaf ↔ Core 링크 OSPF Cost</span></div>
+    <div class="sub">Site1 : 48 + 11 = <b>59</b> &nbsp;&nbsp;|&nbsp;&nbsp; Site2 : 58 + 4 = <b>62</b></div>
+  </div>
+
+  <h3 class="sub">2.1 offset(+11 / +4)이 다른 이유</h3>
+  <p>가산되는 cost는 <strong>각 site의 Border Leaf가 외부 Core까지 도달하는 자신의 OSPF interface/SPF cost</strong>다. 두 site의 Border Leaf↔Core 링크 OSPF interface cost(대역폭 기반 또는 수동 설정)가 다르기 때문에 offset이 11 vs 4로 달라진다.</p>
+
+  <div class="callout note">
+    <div class="ico">i</div>
+    <div class="body">
+      <div class="lbl">문서화 수준에 대한 정직한 고지</div>
+      <p>이 "OSPF cost → MED 상속" 동작은 <strong>Cisco 공식 문서에 명시적으로 기술되어 있지는 않다</strong>(ciscodata 확인). 그러나 ACI 전용 모델(ciscoDeepNetwork) 분석과 <strong>현장 실측이 정확히 일치</strong>하므로 실제 동작은 확정적이다. 일반 NX-OS의 <code class="inl">redistribute ospf</code>가 OSPF metric을 MED로 복사하는 것과 동일한 맥락이다.</p>
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <div class="ico">≠</div>
+    <div class="body">
+      <div class="lbl">앞선 일반론과의 차이</div>
+      <p>"ACI는 IGP 변동이 BGP를 흔들지 않도록 MED를 0으로 둔다"는 일반론이 흔히 인용되지만, <strong>이 환경의 실측은 MED가 OSPF cost를 반영함을 보여준다</strong>. 환경/릴리스/구성에 따라 동작이 다를 수 있으므로 <strong>반드시 실제 장비에서 MED 값을 확인</strong>해야 한다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="s3">
+  <h2 class="sec"><span class="idx">03</span> MED는 Site간 EVPN으로 보존된다</h2>
+  <div class="sec-rule"></div>
+
+  <p>이 현상의 두 번째 핵심. <strong>Local Preference</strong>와 <strong>MED</strong>는 site 경계에서의 거동이 정반대다.</p>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr><th>속성</th><th>Site간 eBGP/EVPN 경계 거동</th><th>이 시나리오에서의 의미</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>MED (Metric)</strong></td>
+        <td><span class="yes">보존(carried)</span> — VPNv4/EVPN 속성으로 end-to-end 전달</td>
+        <td>Site2 leaf도 Site1 경로의 MED 59를 그대로 봄 → 양쪽 동일 판단</td>
+      </tr>
+      <tr>
+        <td><strong>Local Preference</strong></td>
+        <td><span class="no">제거(stripped)</span> — non-transitive, eBGP 경계에서 삭제</td>
+        <td>한 site에서 설정해도 다른 site로 안 넘어감 → <strong>해결책의 열쇠</strong></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="flow">
+    <div class="node hot"><div class="nt">Site2 Border Leaf — OSPF→MP-BGP</div><div class="nd">A에 MED 62 부여 (58+4)</div></div>
+    <div class="arrow">↓<small>iBGP VPNv4 (site 내부)</small></div>
+    <div class="node"><div class="nt">Site2 Spine</div><div class="nd">MED 62 유지</div></div>
+    <div class="arrow">↓<small>eBGP EVPN over ISN — MED 보존, LocPref 제거</small></div>
+    <div class="node"><div class="nt">Site1 Spine</div><div class="nd">여전히 MED 62</div></div>
+    <div class="arrow">↓</div>
+    <div class="node hot"><div class="nt">Site1 Compute Leaf</div><div class="nd">Site1경로 MED 59 vs Site2경로 MED 62 → <b>59 승</b></div></div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ico">✓</div>
+    <div class="body">
+      <div class="lbl">왜 이게 해결의 단서인가</div>
+      <p>MED는 보존되어 끄기 어렵지만, <strong>Local Preference는 site 경계에서 자동 제거</strong>되므로 각 site에서 독립적으로 설정해도 서로 간섭하지 않는다. 그래서 "각 site가 자기 local L3Out 선호"를 <strong>대칭적으로</strong> 구현할 수 있다. (→ <a href="#s6">§6</a>)</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="s4">
+  <h2 class="sec"><span class="idx">04</span> 왜 Suboptimal이 발생하나 — Vantage Point</h2>
+  <div class="sec-rule"></div>
+
+  <p>경로 선택 결과는 <strong>"어느 leaf에서 보느냐"</strong>에 따라 다르다. 이 구분이 결정적이다.</p>
+
+  <h3 class="sub">4.1 Border Leaf 관점 — local이 자동으로 이김</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>경로</th><th>성격</th><th>Next Hop</th><th>best-path 판정</th></tr></thead>
+    <tbody>
+      <tr><td><strong>자기 site L3Out</strong></td><td>locally originated</td><td><code class="inl">0.0.0.0</code></td><td class="center"><span class="yes">✓ 승 (Locally Originated 규칙)</span></td></tr>
+      <tr><td>remote site L3Out</td><td>iBGP/EVPN 수신</td><td>remote TEP</td><td class="center"><span class="no">패</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Border Leaf에서는 자기 L3Out 경로가 <strong>locally originated</strong>라, best-path 상위 규칙에서 이긴다. <strong>MED까지 가지 않음.</strong></p>
+
+  <h3 class="sub">4.2 Compute Leaf 관점 — 여기서 문제 발생 ⚠️</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>경로</th><th>성격 (compute leaf 입장)</th><th>Locally Originated?</th></tr></thead>
+    <tbody>
+      <tr><td>Site1 L3Out 경로</td><td>iBGP 수신 (자기 site SBL로부터)</td><td class="center"><span class="no">아니오</span></td></tr>
+      <tr><td>Site2 L3Out 경로</td><td>iBGP 수신 (SBL=ISN gateway로부터)</td><td class="center"><span class="no">아니오</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout danger">
+    <div class="ico">⚠</div>
+    <div class="body">
+      <div class="lbl">endpoint는 compute leaf에 있다</div>
+      <p>Compute Leaf 입장에서는 <strong>두 경로 모두 iBGP 수신</strong>이라 "Locally Originated" tie-break이 <strong>건너뛰어진다</strong>. 그래서 best-path가 아래로 흘러 내려가 <strong>MED(59 vs 62)에서 결판</strong>나고, MED 낮은 Site1(59)이 양쪽 모두에서 승리한다. → <strong>Site2 endpoint의 suboptimal egress 확정.</strong></p>
+    </div>
+  </div>
+
+  <div class="callout note">
+    <div class="ico">i</div>
+    <div class="body">
+      <div class="lbl">"기본 local-site 우선"은?</div>
+      <p>공식 문서는 "route-map 없으면 IS-IS metric상 가까운 local border leaf 선호"라고 기술하지만, 그것은 <strong>MED/LocPref가 동률일 때의 tie-break</strong>다. 지금처럼 <strong>MED가 다르면 MED가 먼저 결정</strong>하므로 기본 local 선호가 깨진다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="s5">
+  <h2 class="sec"><span class="idx">05</span> BGP Best-Path 결정 흐름</h2>
+  <div class="sec-rule"></div>
+
+  <p>Compute Leaf에서 두 경로(Site1 vs Site2)가 비교되는 순서. <span class="tagm d" style="font-size:10px">현재 결정 지점</span>과 <span class="tagm f" style="font-size:10px">해결 후 결정 지점</span>을 표시했다.</p>
+
+  <ol class="ladder">
+    <li><span class="bp-name">Weight</span><span class="bp-desc">둘 다 0 — tie</span></li>
+    <li class="fix"><span class="bp-name">Local Preference</span><span class="bp-desc">현재 둘 다 100(tie) → <strong>여기에 200 설정 시 즉시 결판</strong></span><span class="tagm f">FIX 지점</span></li>
+    <li><span class="bp-name">Locally Originated</span><span class="bp-desc">compute leaf에선 둘 다 iBGP → 해당 없음 (skip)</span></li>
+    <li><span class="bp-name">AS-Path 길이</span><span class="bp-desc">동일 — tie</span></li>
+    <li><span class="bp-name">Origin Type</span><span class="bp-desc">동일(보통 incomplete) — tie</span></li>
+    <li class="decide"><span class="bp-name">MED</span><span class="bp-desc">59(Site1) vs 62(Site2) → <strong>낮은 59 승 = 현재 문제의 원인</strong></span><span class="tagm d">현재 결정</span></li>
+    <li><span class="bp-name">eBGP &gt; iBGP</span><span class="bp-desc">여기까지 오지 않음</span></li>
+    <li><span class="bp-name">IGP metric to next-hop</span><span class="bp-desc">MED가 같았다면 여기서 가까운 BL 선택</span></li>
+  </ol>
+
+  <div class="callout tip">
+    <div class="ico">★</div>
+    <div class="body">
+      <div class="lbl">전략의 핵심</div>
+      <p><strong>Local Preference(2단계)는 MED(6단계)보다 훨씬 먼저 평가</strong>된다. local 경로에 LocPref 200을 주면, MED 59 vs 62 차이를 <strong>비교하기도 전에</strong> 결판나서 각 site가 자기 local L3Out을 선택한다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="s6">
+  <h2 class="sec"><span class="idx">06</span> 해결책 — Local Preference (대칭 적용)</h2>
+  <div class="sec-rule"></div>
+
+  <p>각 site의 <strong>local L3Out import 경로에 Local Preference 200</strong>을 부여한다. MED 차이를 덮어쓰고, LocPref는 site 경계에서 제거되므로 양 site가 독립적으로 자기 local을 선호한다.</p>
+
+  <h4 class="subsub">Site2 Compute Leaf 관점 (해결 후)</h4>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>속성</th><th>Site2-L3Out (local)</th><th>Site1-L3Out (remote)</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td>Weight</td><td class="num">0</td><td class="num">0</td><td>tie</td></tr>
+      <tr><td><strong>Local Preference</strong></td><td class="win-cell">200 (설정)</td><td class="num">100 (기본)</td><td class="center"><span class="yes">✓ Site2 local 승</span></td></tr>
+      <tr><td>MED</td><td class="num">62</td><td class="num">59</td><td>무시됨 (LocPref가 이미 결정)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout danger">
+    <div class="ico">✕</div>
+    <div class="body">
+      <div class="lbl">OSPF Cost 조정은 왜 나쁜가</div>
+      <p>OSPF cost를 만져 MED를 뒤집으면 일시적으로 고쳐지지만, <strong>외부 토폴로지 변동·링크 장애 시 MED가 다시 흔들려 트래픽이 의도치 않게 넘어간다</strong>. 비결정적이고 취약하다. Local Preference는 외부 metric 변동과 <strong>무관하게 결정적</strong>이다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ico">✓</div>
+    <div class="body">
+      <div class="lbl">두 가지 작동 원리</div>
+      <p><strong>1.</strong> LocPref(2단계)는 MED(6단계)보다 먼저 평가 → MED 59/62 차이를 덮어씀.<br>
+      <strong>2.</strong> LocPref는 site간 eBGP에서 strip → Site1의 200은 Site1에만, Site2의 200은 Site2에만 유효 → 대칭적 local 선호 완성.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="s7">
+  <h2 class="sec"><span class="idx">07</span> 설정 절차 (NDO/MSO 또는 각 Site APIC)</h2>
+  <div class="sec-rule"></div>
+
+  <p><strong>양 site에 대칭으로</strong> 동일하게 적용한다. (Site1은 Site1 L3Out에, Site2는 Site2 L3Out에)</p>
+
+  <ol class="steps">
+    <li>
+      <div class="stt">Match Rule 생성 — 외부 네트워크 A 매칭</div>
+      <div class="loc">Tenant &gt; Policies &gt; Protocol &gt; Match Rules for Route Map</div>
+      <ul><li>Match Prefix = 네트워크 A (또는 대상 external subnet / <code class="inl">0.0.0.0/0</code>)</li></ul>
+    </li>
+    <li>
+      <div class="stt">Set Rule 생성 — Local Preference 200</div>
+      <div class="loc">Tenant &gt; Policies &gt; Protocol &gt; Set Rules for Route Map</div>
+      <ul><li><strong>Set Preference = 200</strong> (기본 100보다 높게)</li></ul>
+    </li>
+    <li>
+      <div class="stt">L3Out Route Map 생성 + Import 방향 적용</div>
+      <div class="loc">Tenant &gt; Networking &gt; L3Outs &gt; [local L3Out] &gt; Route map for import and export route control</div>
+      <ul>
+        <li>Type = <strong>Route Control</strong></li>
+        <li>Context = Permit, Match Rule + Set Rule 연결</li>
+        <li><strong>Direction = Import</strong> (외부→내부 수신 경로 제어)</li>
+      </ul>
+    </li>
+    <li>
+      <div class="stt">External EPG Subnet에 적용</div>
+      <div class="loc">L3Out &gt; External EPGs &gt; [ExtEPG] &gt; Subnet</div>
+      <ul><li>해당 subnet에 <strong>Import Route Control</strong> 활성화 + Route Map 연결</li></ul>
+    </li>
+    <li>
+      <div class="stt">반대 site에도 동일 적용 (대칭)</div>
+      <div class="loc">Site2 local L3Out → 동일하게 Set Preference 200</div>
+      <ul><li>이로써 Site1↔Site1, Site2↔Site2 각자 local 선호 완성</li></ul>
+    </li>
+  </ol>
+
+  <div class="callout note">
+    <div class="ico">✎</div>
+    <div class="body">
+      <div class="lbl">개념 표현 (이해용 — 실제는 GUI/MO)</div>
+    </div>
+  </div>
+  <div class="code">
+    <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="lang">pseudo · per-site local L3Out import</span><button class="copy">복사</button></div>
+<pre><span class="t-cmt">! 각 site의 local L3Out import에 적용 (대칭)</span>
+<span class="t-kw">ip prefix-list</span> NET_A <span class="t-kw">permit</span> <span class="t-num">A.A.A.0/24</span>
+<span class="t-kw">route-map</span> LOCAL_L3OUT_IMPORT <span class="t-kw">permit</span> <span class="t-num">10</span>
+  <span class="t-kw">match ip address prefix-list</span> NET_A
+  <span class="t-kw">set local-preference</span> <span class="t-num">200</span>   <span class="t-good">! ← 자기 site local 경로 선호 (MED 무시)</span></pre>
+  </div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="s8">
+  <h2 class="sec"><span class="idx">08</span> 진단 명령어</h2>
+  <div class="sec-rule"></div>
+
+  <p>ACI leaf의 <code class="inl">vsh_lc</code> 셸에서 실행. <strong>compute leaf</strong>(endpoint 있는 곳)와 <strong>border leaf</strong> 양쪽에서 비교하는 것이 핵심이다.</p>
+
+  <div class="code">
+    <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="lang">leaf · vsh_lc</span><button class="copy">복사</button></div>
+<pre><span class="t-cmt"># 1) line-card 셸 진입 (일반 ACI CLI 아님)</span>
+<span class="t-prompt">leaf#</span> vsh_lc
+
+<span class="t-cmt"># 2) 특정 prefix의 모든 BGP 후보 경로 + 속성 확인 (핵심)</span>
+<span class="t-prompt">module-1#</span> show bgp vpnv4 unicast vrf <span class="t-str">&lt;tenant:vrf&gt;</span> <span class="t-num">A.A.A.0/24</span>
+
+<span class="t-cmt"># 3) RIB에 실제 설치된 best 경로만 확인</span>
+<span class="t-prompt">module-1#</span> show ip route vrf <span class="t-str">&lt;tenant:vrf&gt;</span> <span class="t-num">A.A.A.0/24</span></pre>
+  </div>
+
+  <h4 class="subsub">출력에서 확인할 핵심 컬럼</h4>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>컬럼</th><th>의미 / 확인 포인트</th></tr></thead>
+    <tbody>
+      <tr><td><code class="inl">Network</code></td><td><code class="inl">RD:prefix</code> 형식 (VPNv4)</td></tr>
+      <tr><td><code class="inl">Next Hop</code></td><td><code class="inl">0.0.0.0</code>=local 발생 / TEP IP=remote(다른 BL 또는 site)</td></tr>
+      <tr><td class="hot-cell">Metric (MED)</td><td><strong>여기가 59 vs 62</strong> — 어느 경로가 낮은지 확인 (낮은 게 이김)</td></tr>
+      <tr><td><code class="inl">LocPrf</code></td><td>둘 다 100이면 MED가 결정자라는 증거 / 200이면 fix 적용됨</td></tr>
+      <tr><td><code class="inl">&gt;</code> 마커</td><td>best path. 어느 Next Hop에 붙었는지 = 실제 선택된 경로</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="code diagram">
+    <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="lang">예시 출력 (문제 상황)</span><button class="copy">복사</button></div>
+<pre>   Network                  Next Hop        <span class="t-hi">Metric</span> LocPrf Weight Path
+*&gt;i RD:A.A.A.0/24          &lt;Site1-BL TEP&gt;   <span class="t-bad">59</span>    100    0      i   <span class="t-bad">← best (낮은 MED)</span>
+* i RD:A.A.A.0/24          &lt;Site2-BL TEP&gt;   62     100    0      i   <span class="t-cmt">← 탈락</span>
+
+<span class="t-cmt"># 진단: LocPrf 둘 다 100(tie) → MED 59 vs 62에서 결판 → 59(Site1) 승</span>
+<span class="t-cmt"># Site2 compute leaf에서도 동일 → Site2 트래픽이 Site1로 우회 = suboptimal</span></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ico">→</div>
+    <div class="body">
+      <div class="lbl">해결 확인</div>
+      <p>fix 적용 후 같은 명령 재실행 → local 경로의 <code class="inl">LocPrf</code>가 <strong>200</strong>으로 보이고 <code class="inl">&gt;</code> best 마커가 <strong>자기 site BL Next Hop</strong>으로 이동하면 성공.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="s9">
+  <h2 class="sec"><span class="idx">09</span> 오해 정정 (Myth → Fact)</h2>
+  <div class="sec-rule"></div>
+
+  <p>이 케이스에서 흔한 오해와, 실측·검증으로 확인된 사실을 대조한다.</p>
+
+  <div class="myth">
+    <div class="row">
+      <div class="m"><div class="lbl">✕ Myth (오해)</div>ACI는 OSPF cost를 MP-BGP MED로 반영하지 않는다 (MED=0 유지).</div>
+      <div class="f"><div class="lbl">✓ Fact (실측)</div>이 환경에서는 <strong>OSPF cost가 MED로 상속</strong>된다. MED = core cost + BL local cost (48+11=59, 58+4=62).</div>
+    </div>
+    <div class="row">
+      <div class="m"><div class="lbl">✕ Myth</div>MED는 site간 경계에서 의미 없어지거나 리셋된다.</div>
+      <div class="f"><div class="lbl">✓ Fact</div>MED는 <strong>EVPN으로 보존(transitive)</strong>되어 remote site leaf도 동일 값을 본다.</div>
+    </div>
+    <div class="row">
+      <div class="m"><div class="lbl">✕ Myth</div>Multi-Site는 기본적으로 각 site가 자기 local L3Out을 우선한다.</div>
+      <div class="f"><div class="lbl">✓ Fact</div>그 기본 동작은 <strong>MED/LocPref 동률일 때만</strong>. MED가 다르면 깨지고 한쪽으로 쏠린다.</div>
+    </div>
+    <div class="row">
+      <div class="m"><div class="lbl">✕ Myth</div>OSPF cost를 맞추면 경로 문제를 해결할 수 있다.</div>
+      <div class="f"><div class="lbl">✓ Fact</div>가능하나 <strong>취약·비결정적</strong>. 외부 변동에 다시 흔들림. <strong>Local Preference가 정답.</strong></div>
+    </div>
+  </div>
+
+  <div class="callout note">
+    <div class="ico">∑</div>
+    <div class="body">
+      <div class="lbl">검증 출처</div>
+      <p>ACI 전용 모델(ciscoDeepNetwork)이 실측과 일치하는 메커니즘을 설명했고, 공식 RAG(ciscodata)는 MED의 site간 보존과 "route-map으로 LocPref 조정"을 공식 문서로 확인. OSPF cost→MED 상속은 공식 문서에 명시는 없으나 실측으로 확정. (출처: <a href="#s11">§11</a>)</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="s10">
+  <h2 class="sec"><span class="idx">10</span> 조치 체크리스트</h2>
+  <div class="sec-rule"></div>
+  <p>클릭하여 진행 상황을 체크하세요.</p>
+  <ul class="check">
+    <li><span class="box">✓</span><span class="tx">compute leaf에서 <code class="inl">show bgp vpnv4 unicast vrf … A</code>로 두 경로 MED(59/62)와 LocPrf(100/100) 확인</span></li>
+    <li><span class="box">✓</span><span class="tx"><code class="inl">&gt;</code> best 마커가 remote(Site1) Next Hop에 있어 suboptimal임을 확정</span></li>
+    <li><span class="box">✓</span><span class="tx">원인이 OSPF cost가 아니라 <strong>MED(=OSPF cost 상속) + LocPref 동률</strong>임을 인지</span></li>
+    <li><span class="box">✓</span><span class="tx">Match Rule(네트워크 A) 생성</span></li>
+    <li><span class="box">✓</span><span class="tx">Set Rule <strong>Set Preference = 200</strong> 생성</span></li>
+    <li><span class="box">✓</span><span class="tx">각 site local L3Out에 <strong>Import 방향</strong> Route Map 적용</span></li>
+    <li><span class="box">✓</span><span class="tx"><strong>양 site 대칭</strong> 적용 확인 (Site1·Site2 각각 자기 L3Out)</span></li>
+    <li><span class="box">✓</span><span class="tx">OSPF interface cost는 <strong>건드리지 않음</strong> (취약한 해법 회피)</span></li>
+    <li><span class="box">✓</span><span class="tx">fix 후 재검증: LocPrf 200 + best 마커가 자기 site BL로 이동</span></li>
+  </ul>
+</section>
+
+<!-- ============ 11 ============ -->
+<section id="s11">
+  <h2 class="sec"><span class="idx">11</span> 참고 문서 (Cisco 공식)</h2>
+  <div class="sec-rule"></div>
+
+  <ul class="refs">
+    <li>
+      <div class="rn">[1]</div>
+      <div class="rc">
+        <div class="rt">Configure Intersite L3Out with ACI Multi-Site Fabrics (Support Doc 217597)</div>
+        <div class="ru"><a href="https://www.cisco.com/c/en/us/support/docs/software/aci-data-center/217597-configure-intersite-l3out-with-aci-multi.html" target="_blank" rel="noopener">cisco.com › …/217597-configure-intersite-l3out-with-aci-multi.html</a></div>
+      </div>
+    </li>
+    <li>
+      <div class="rn">[2]</div>
+      <div class="rc">
+        <div class="rt">Cisco ACI Multi-Site Architecture White Paper (c11-739609)</div>
+        <div class="ru"><a href="https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-739609.html" target="_blank" rel="noopener">cisco.com › …/white-paper-c11-739609.html</a></div>
+      </div>
+    </li>
+    <li>
+      <div class="rn">[3]</div>
+      <div class="rc">
+        <div class="rt">Cisco Multi-Site Deployment Guide for ACI Fabrics (NDO)</div>
+        <div class="ru"><a href="https://www.cisco.com/c/en/us/td/docs/dcn/whitepapers/cisco-multi-site-deployment-guide-for-aci-fabrics.html" target="_blank" rel="noopener">cisco.com › …/cisco-multi-site-deployment-guide-for-aci-fabrics.html</a></div>
+      </div>
+    </li>
+    <li>
+      <div class="rn">[4]</div>
+      <div class="rc">
+        <div class="rt">APIC Layer 3 Networking Configuration Guide 6.2(x) — WAN/External Forwarding</div>
+        <div class="ru"><a href="https://www.cisco.com/c/en/us/td/docs/dcn/aci/apic/6x/l3-configuration/cisco-apic-layer-3-networking-configuration-guide-62x/wan-and-other-external-net-forwarding-layer3-config-62x.html" target="_blank" rel="noopener">cisco.com › …/wan-and-other-external-net-forwarding-layer3-config-62x.html</a></div>
+      </div>
+    </li>
+    <li>
+      <div class="rn">[5]</div>
+      <div class="rc">
+        <div class="rt">Understand the Redistribution of OSPF Routes into BGP (일반 NX-OS 동작 — 대조용)</div>
+        <div class="ru"><a href="https://www.cisco.com/c/en/us/support/docs/ip/border-gateway-protocol-bgp/5242-bgp-ospf-redis.html" target="_blank" rel="noopener">cisco.com › …/5242-bgp-ospf-redis.html</a></div>
+      </div>
+    </li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ico">⚠</div>
+    <div class="body">
+      <div class="lbl">중요 면책</div>
+      <p>"OSPF cost → MED 상속" 및 "MED의 site간 보존"은 본 환경의 실측과 ACI 전용 모델 분석으로 확인된 동작이며, <strong>릴리스/구성에 따라 다를 수 있다</strong>. 배포 전 <strong>반드시 실제 장비에서 <code class="inl">show bgp vpnv4 unicast vrf … &lt;prefix&gt;</code>로 MED·LocPref 값을 직접 확인</strong>하라.</p>
+    </div>
+  </div>
+</section>
+
+  </div><!--/content-->
+
+  <footer>
+    <div class="disc">본 문서는 현장 실측 데이터와 Cisco 내부 지식 소스(Circuit: ciscoDeepNetwork + ciscodata) 교차검증을 기반으로 작성되었습니다. ACI의 interleak MED 거동은 릴리스·구성에 의존할 수 있으므로 운영 환경의 실제 장비 출력으로 반드시 재확인하십시오.</div>
+    <div>ACI Multi-Site L3Out · OSPF Cost / MED Suboptimal Egress 트러블슈팅 · 단일 stretched VRF · Local Preference 해법</div>
+  </footer>
+</main>
+</div>
+
+<div id="toTop" title="맨 위로">↑</div>
+
+<script>
+const links=[...document.querySelectorAll('nav.toc a')];
+const secIds=links.map(a=>a.getAttribute('href').slice(1));
+const prog=document.getElementById('progress');
+const toTop=document.getElementById('toTop');
+function onScroll(){
+  const h=document.documentElement;
+  const sc=h.scrollTop, max=h.scrollHeight-h.clientHeight;
+  prog.style.width=(max>0?(sc/max*100):0)+'%';
+  toTop.classList.toggle('show',sc>500);
+  let cur=secIds[0];
+  for(const id of secIds){const el=document.getElementById(id); if(el && el.getBoundingClientRect().top<=120) cur=id;}
+  links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+cur));
+}
+document.addEventListener('scroll',onScroll,{passive:true});
+window.addEventListener('load',onScroll);
+toTop.onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
+
+function bindCopy(){
+  document.querySelectorAll('.code .copy').forEach(b=>{
+    if(b.dataset.bound)return; b.dataset.bound=1;
+    b.onclick=()=>{
+      const pre=b.closest('.code').querySelector('pre');
+      navigator.clipboard.writeText(pre.innerText).then(()=>{
+        const t=b.textContent; b.textContent='✓ 복사됨'; b.classList.add('done');
+        setTimeout(()=>{b.textContent=t;b.classList.remove('done')},1400);
+      });
+    };
+  });
+}
+
+const themeBtn=document.getElementById('themeBtn'), themeLbl=document.getElementById('themeLbl');
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);
+  themeBtn.firstChild.textContent=(t==='light'?'☀️ ':'🌙 ');themeLbl.textContent=(t==='light'?'Light':'Dark');
+  try{localStorage.setItem('msl3out-theme',t)}catch(e){}}
+themeBtn.onclick=()=>setTheme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light');
+try{setTheme(localStorage.getItem('msl3out-theme')||'dark')}catch(e){setTheme('dark')}
+
+const sb=document.getElementById('sidebar'),scrim=document.getElementById('scrim'),menuBtn=document.getElementById('menuBtn');
+function closeM(){sb.classList.remove('open');scrim.classList.remove('show')}
+menuBtn.onclick=()=>{sb.classList.toggle('open');scrim.classList.toggle('show')};
+scrim.onclick=closeM;
+document.querySelectorAll('nav.toc a').forEach(a=>a.addEventListener('click',closeM));
+
+function bindChecks(){document.querySelectorAll('.check li').forEach(li=>{
+  if(li.dataset.b)return; li.dataset.b=1;
+  li.onclick=()=>li.classList.toggle('done');
+});}
+
+const si=document.getElementById('searchInput');
+if(si){si.addEventListener('input',()=>{
+  const q=si.value.trim().toLowerCase();
+  document.querySelectorAll('main section').forEach(sec=>{
+    if(!q){sec.style.display='';return;}
+    sec.style.display=sec.innerText.toLowerCase().includes(q)?'':'none';
+  });
+});}
+
+window.addEventListener('DOMContentLoaded',()=>{bindCopy();bindChecks();});
+</script>
+</body>
+</html>

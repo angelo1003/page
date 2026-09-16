@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M365 트래픽을 위한 NAT 설계 — 1:1 NAT vs. PAT</title>
+<style>
+  :root{
+    --bg:#0a0e1a; --bg2:#0f1729; --card:#131c33; --card2:#18233f;
+    --ink:#e8edf7; --muted:#9aa8c2; --line:#243352;
+    --pat:#4f9cff; --pat2:#7dd3fc; --one:#ff8a5c; --one2:#ffc14d;
+    --good:#34d399; --warn:#fbbf24; --bad:#f87171; --acc:#a78bfa;
+    --grad:linear-gradient(135deg,#4f9cff 0%,#a78bfa 50%,#ff8a5c 100%);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;
+    background:radial-gradient(1200px 800px at 80% -10%,#1c2a4d 0%,transparent 60%),
+               radial-gradient(900px 700px at -10% 20%,#241a3d 0%,transparent 55%),var(--bg);
+    color:var(--ink);line-height:1.65;-webkit-font-smoothing:antialiased
+  }
+  .wrap{max-width:1100px;margin:0 auto;padding:0 22px 100px}
+  /* hero */
+  header{padding:90px 22px 60px;text-align:center;position:relative;overflow:hidden}
+  header::before{content:"";position:absolute;inset:0;background:var(--grad);opacity:.07;filter:blur(40px)}
+  .badge{display:inline-block;padding:7px 16px;border:1px solid var(--line);border-radius:999px;
+    font-size:13px;color:var(--pat2);background:rgba(79,156,255,.08);margin-bottom:22px;letter-spacing:.5px}
+  h1{font-size:clamp(30px,5vw,52px);line-height:1.15;font-weight:800;letter-spacing:-1px;
+    background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{margin-top:18px;color:var(--muted);font-size:17px}
+  .sub b{color:var(--ink)}
+  /* layout */
+  section{margin-top:64px}
+  .eyebrow{font-size:13px;letter-spacing:3px;color:var(--acc);text-transform:uppercase;font-weight:700}
+  h2{font-size:30px;font-weight:800;margin:8px 0 24px;letter-spacing:-.5px}
+  h3{font-size:20px;font-weight:700;margin:0 0 14px}
+  p{color:#cdd6e8}
+  .card{background:linear-gradient(160deg,var(--card),var(--card2));border:1px solid var(--line);
+    border-radius:18px;padding:26px;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:780px){.grid2,.grid3{grid-template-columns:1fr}}
+  /* tldr */
+  .tldr{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:780px){.tldr{grid-template-columns:1fr}}
+  .tldr .item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .tldr .k{font-size:12px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+  .tldr .v{margin-top:6px;font-size:16px}
+  .pill{display:inline-block;padding:3px 10px;border-radius:8px;font-weight:700;font-size:14px}
+  .p-pat{background:rgba(79,156,255,.16);color:var(--pat2)}
+  .p-one{background:rgba(255,138,92,.16);color:var(--one2)}
+  /* compare cols */
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:780px){.vs{grid-template-columns:1fr}}
+  .col h3 .tag{font-size:12px;padding:3px 9px;border-radius:8px;margin-left:8px;vertical-align:middle}
+  .lst{list-style:none;margin:14px 0 0}
+  .lst li{padding:7px 0 7px 26px;position:relative;color:#cdd6e8;border-top:1px solid rgba(255,255,255,.04)}
+  .lst li::before{position:absolute;left:0;top:7px}
+  .pro li::before{content:"▲";color:var(--good)}
+  .con li::before{content:"▼";color:var(--bad)}
+  .group{font-size:12px;letter-spacing:1px;color:var(--muted);margin-top:18px;text-transform:uppercase}
+  /* bars */
+  .bars{margin-top:8px}
+  .bar{display:grid;grid-template-columns:90px 1fr 130px;align-items:center;gap:12px;margin:10px 0}
+  .bar .lbl{font-size:14px;color:var(--muted)}
+  .track{height:26px;background:#0c1426;border:1px solid var(--line);border-radius:8px;overflow:hidden;position:relative}
+  .fill{height:100%;border-radius:7px;background:var(--grad);width:0;transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
+  .bar .val{font-size:13px;color:var(--pat2);text-align:right}
+  /* table */
+  table{width:100%;border-collapse:collapse;margin-top:6px;font-size:15px}
+  th,td{padding:13px 14px;text-align:left;border-bottom:1px solid var(--line)}
+  th{color:var(--pat2);font-size:13px;letter-spacing:.5px;text-transform:uppercase}
+  tr:hover td{background:rgba(79,156,255,.05)}
+  code{background:#0c1426;border:1px solid var(--line);padding:2px 7px;border-radius:6px;color:var(--pat2);font-size:14px}
+  pre{background:#0c1426;border:1px solid var(--line);border-radius:12px;padding:18px;overflow:auto;margin-top:10px}
+  pre code{border:0;background:none;padding:0;color:#bfe0ff}
+  /* arch steps */
+  .steps{counter-reset:s;display:grid;gap:14px}
+  .step{display:flex;gap:16px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .step .n{counter-increment:s;flex:0 0 38px;height:38px;border-radius:11px;display:grid;place-items:center;
+    font-weight:800;background:var(--grad);color:#06101f}
+  .step .n::before{content:counter(s)}
+  /* checklist */
+  .chk{list-style:none;display:grid;gap:10px}
+  .chk li{padding:13px 16px 13px 44px;position:relative;background:var(--card);border:1px solid var(--line);border-radius:11px}
+  .chk li::before{content:"✓";position:absolute;left:16px;top:13px;color:var(--good);font-weight:800}
+  blockquote{border-left:3px solid var(--acc);padding:8px 18px;color:var(--muted);background:rgba(167,139,250,.06);border-radius:0 10px 10px 0;margin-top:18px}
+  /* cases */
+  .cases{display:grid;gap:16px}
+  .case{background:linear-gradient(160deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:16px;padding:22px 24px;position:relative;overflow:hidden}
+  .case::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--grad)}
+  .case .head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .case .ix{flex:0 0 34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:800;background:var(--grad);color:#06101f}
+  .case h3{margin:0;font-size:18px}
+  .case .ct{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--pat2);background:rgba(79,156,255,.08)}
+  .case p{margin-top:12px;font-size:15px}
+  .case .eff{margin-top:12px;display:grid;gap:8px}
+  .case .eff span{display:block;padding:9px 14px 9px 30px;position:relative;background:#0c1426;border:1px solid var(--line);border-radius:10px;font-size:14px;color:#cdd6e8}
+  .case .eff span::before{content:"→";position:absolute;left:12px;top:9px;color:var(--good);font-weight:800}
+  footer{margin-top:70px;text-align:center;color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:26px}
+</style>
+</head>
+<body>
+<header>
+  <div class="badge">네트워크 엔지니어 · 아키텍트 관점 분석 · 2026-06-29</div>
+  <h1>M365 트래픽을 위한 NAT 설계</h1>
+  <p class="sub"><b>1:1 NAT</b> vs. <b>PAT(NAT44 / Overload)</b> — 무엇을, 언제, 왜 쓰는가</p>
+</header>
+
+<div class="wrap">
+
+  <!-- 핵심 요약 -->
+  <section>
+    <div class="eyebrow">핵심 요약</div>
+    <h2>핵심 요약</h2>
+    <div class="tldr">
+      <div class="item"><div class="k">기본 권장</div><div class="v"><span class="pill p-pat">PAT (NAT Overload)</span> — 충분한 IP 풀 + 포트 소진 모니터링 전제</div></div>
+      <div class="item"><div class="k">1:1 NAT</div><div class="v"><span class="pill p-one">예외 적용</span> 인바운드 필요(Hybrid Exchange) · 송신 IP 고정 소수 단말</div></div>
+      <div class="item"><div class="k">가장 중요한 사실</div><div class="v">방식보다 <b>PAT 풀 규모 산정·세션 한계</b>가 진짜 병목</div></div>
+      <div class="item"><div class="k">상위 원칙</div><div class="v">Microsoft 권장: <b>로컬 egress + 인스펙션 우회</b>. NAT은 그 다음</div></div>
+    </div>
+    <blockquote>NAT 논의에 앞서 Microsoft는 "트래픽을 식별하고, 가까운 곳에서 인터넷으로 직접 내보내며(local egress), 프록시·TLS 인스펙션을 우회하라"고 권고합니다. NAT 방식 선택은 큰 그림 안의 하위 결정입니다.</blockquote>
+  </section>
+
+  <!-- 왜 까다로운가 -->
+  <section>
+    <div class="eyebrow">배경</div>
+    <h2>왜 M365에서 NAT이 특별히 까다로운가</h2>
+    <div class="grid2">
+      <div class="card"><h3>🌐 분산 SaaS</h3><p>Exchange Online, SharePoint/OneDrive, Teams가 전 세계 Front Door로 흩어진 다수 엔드포인트에 동시 접속.</p></div>
+      <div class="card"><h3>🔗 사용자당 동시 연결 多</h3><p>한 명이 수십 개 TCP 세션 상시 유지. 사이징 기준 <b>활성 사용자당 약 4 동시 연결</b>(Optimize).</p></div>
+      <div class="card"><h3>⏱ Long-lived 세션</h3><p>Teams 미디어·Outlook 푸시는 오래 유지 → <b>포트 점유 시간</b>이 길다.</p></div>
+      <div class="card"><h3>📡 QUIC / UDP</h3><p>핸드셰이크 없는 UDP는 NAT 타임아웃·플로우 추적 부담이 다름.</p></div>
+    </div>
+    <blockquote>결과: 한 단말의 NAT 포트 점유가 일반 브라우징보다 훨씬 커, <b>PAT 포트 소진(port exhaustion)</b>이 1순위 리스크.</blockquote>
+  </section>
+
+  <!-- 비교 -->
+  <section>
+    <div class="eyebrow">두 방식 비교</div>
+    <h2>1:1 NAT vs. PAT</h2>
+    <div class="vs">
+      <div class="col card">
+        <h3>1:1 NAT <span class="tag p-one">Static</span></h3>
+        <p>내부 IP ↔ 공인 IP를 1:1 매핑. 포트 변환 없음.</p>
+        <div class="group">장점</div>
+        <ul class="lst pro"><li>포트 소진 없음 — 동시 연결 多 무관</li><li>인바운드 가능 — Hybrid Exchange 등</li><li>추적·감사 단순 (1 IP = 1 단말)</li><li>세션 한계 예측 용이</li></ul>
+        <div class="group">단점</div>
+        <ul class="lst con"><li>공인 IP 대량 필요 — 대규모엔 비현실적</li><li>비용·할당 부담 (IPv4 고갈)</li><li>인바운드 핀홀 → 보안 표면 증가</li><li>IP 낭비, 풀 효율화 없음</li></ul>
+      </div>
+      <div class="col card">
+        <h3>PAT (Overload) <span class="tag p-pat">NAT44</span></h3>
+        <p>다수 내부 IP를 소수 공인 IP + 포트로 변환.</p>
+        <div class="group">장점</div>
+        <ul class="lst pro"><li>IP 효율 극대 — 1개로 수천 세션</li><li>아웃바운드 보안 기본(인바운드 차단)</li><li>대규모 M365에 현실적</li></ul>
+        <div class="group">단점</div>
+        <ul class="lst con"><li>포트 소진 — IP당 ~64k, 빠르게 고갈</li><li>세션 테이블 부하(CPU·메모리)</li><li>로그 상관분석 복잡(IP+포트+시각)</li><li>단일 IP 평판 오염 시 광범위 영향</li><li>타임아웃 튜닝 필수</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 사이징 -->
+  <section>
+    <div class="eyebrow">핵심 계산</div>
+    <h2>PAT 포트 사이징</h2>
+    <pre><code>필요 동시연결 = 활성사용자 × 4
+필요 공인IP  = 필요 동시연결 / IP당 가용포트(≈50,000)</code></pre>
+    <div class="card" style="margin-top:18px">
+      <table>
+        <thead><tr><th>활성 사용자</th><th>동시연결 (×4)</th><th>필요 공인 IP (≈50k)</th><th>권장 풀 (여유)</th></tr></thead>
+        <tbody>
+          <tr><td>1,000</td><td>4,000</td><td>1</td><td>2</td></tr>
+          <tr><td>5,000</td><td>20,000</td><td>1</td><td>2</td></tr>
+          <tr><td>10,000</td><td>40,000</td><td>1</td><td>2</td></tr>
+          <tr><td>25,000</td><td>100,000</td><td>2</td><td>3~4</td></tr>
+          <tr><td>50,000</td><td>200,000</td><td>4</td><td>6~8</td></tr>
+        </tbody>
+      </table>
+      <h3 style="margin-top:24px">동시연결 규모 시각화</h3>
+      <div class="bars">
+        <div class="bar"><span class="lbl">1,000</span><div class="track"><div class="fill" data-w="2"></div></div><span class="val">4,000</span></div>
+        <div class="bar"><span class="lbl">5,000</span><div class="track"><div class="fill" data-w="10"></div></div><span class="val">20,000</span></div>
+        <div class="bar"><span class="lbl">10,000</span><div class="track"><div class="fill" data-w="20"></div></div><span class="val">40,000</span></div>
+        <div class="bar"><span class="lbl">25,000</span><div class="track"><div class="fill" data-w="50"></div></div><span class="val">100,000</span></div>
+        <div class="bar"><span class="lbl">50,000</span><div class="track"><div class="fill" data-w="100"></div></div><span class="val">200,000</span></div>
+      </div>
+    </div>
+    <blockquote>실제론 동기화 폭주·재시도로 4를 초과 → <b>2배 여유</b>. PAT를 쓰되 <b>여러 공인 IP 풀</b>로 소진을 분산하는 것이 표준.</blockquote>
+  </section>
+
+  <!-- 아키텍처 -->
+  <section>
+    <div class="eyebrow">권장 아키텍처</div>
+    <h2>혼합 설계 5단계</h2>
+    <div class="steps">
+      <div class="step"><div class="n"></div><div><b>상위 원칙 먼저</b> — Optimize/Allow는 로컬 egress + 인스펙션·프록시 우회 + 직접 인터넷. NAT만 거치게.</div></div>
+      <div class="step"><div class="n"></div><div><b>기본은 PAT 풀</b> — 사이징표대로 공인 IP 다수 풀로 포트 소진 분산.</div></div>
+      <div class="step"><div class="n"></div><div><b>1:1 NAT은 예외만</b> — Hybrid 인바운드, 송신 IP 고정 소수 시스템.</div></div>
+      <div class="step"><div class="n"></div><div><b>타임아웃 튜닝</b> — long-lived/UDP에 맞춰 세션 타임아웃·테이블 상향.</div></div>
+      <div class="step"><div class="n"></div><div><b>분기별 풀 검증</b> — 활성 사용자·동시연결 증가 추적, 포트 사용률 70% 알람.</div></div>
+    </div>
+  </section>
+
+  <!-- 모니터링 -->
+  <section>
+    <div class="eyebrow">운영</div>
+    <h2>모니터링 체크리스트</h2>
+    <ul class="chk">
+      <li>PAT 포트 사용률(IP별): 70% 경고 / 85% 임계</li>
+      <li>세션 테이블 사용률·생성률 모니터링</li>
+      <li>UDP/QUIC 플로우 타임아웃 적정성</li>
+      <li>송신 IP 평판(블랙리스트) 점검</li>
+      <li>분기별 사용자 증가 대비 풀 재산정</li>
+    </ul>
+  </section>
+
+  <!-- 실제 사례 -->
+  <section>
+    <div class="eyebrow">실전 적용</div>
+    <h2>글로벌 기업의 실제 적용 사례</h2>
+    <p>NAT 방식 자체를 공개하는 기업은 드물지만, Microsoft가 문서화한 대규모 고객 패턴과 업계 표준 배포를 보면 답은 명확합니다 — <b>NAT 변환량 자체를 줄이고 트래픽을 로컬에서 직접 내보내는 방향</b>입니다.</p>
+    <div class="cases" style="margin-top:22px">
+      <div class="case">
+        <div class="head"><div class="ix">1</div><h3>COVID-19 대규모 재택 — Forced VPN → Split Tunnel</h3><span class="ct">가장 광범위한 사례</span></div>
+        <p>다수 고객이 <b>내부 트래픽 80% → 외부 클라우드 20% 이하</b>로 역전. 전 트래픽을 VPN으로 강제 백홀하던 기업은 재택 폭증으로 <b>VPN·중앙 egress·NAT 장비가 동시 포화</b>되었다.</p>
+        <div class="eff">
+          <span>Teams·SharePoint·Exchange의 <b>Optimize 엔드포인트(약 20개 IP 서브넷 = 트래픽 70~80%)</b>를 VPN에서 분리해 로컬 직접 송출</span>
+          <span>중앙 PAT 통과 세션 급감 → <b>포트 소진·세션 테이블 부하 즉시 완화</b> (구현 수 시간)</span>
+          <span>인라인 검사 대신 Tenant Restrictions·Conditional Access(MFA)·Purview DLP로 보안 대체</span>
+        </div>
+      </div>
+      <div class="case">
+        <div class="head"><div class="ix">2</div><h3>글로벌 분산 지사 — SD-WAN 로컬 브레이크아웃</h3><span class="ct">제조·리테일·물류</span></div>
+        <p>본사 한 곳으로 모아 NAT/검사하던 구조에서 <b>본사 중앙 PAT가 병목</b>이 되자, 각 지사에서 직접 인터넷 브레이크아웃으로 전환.</p>
+        <div class="eff">
+          <span>중앙 IP 풀 집중 부하를 <b>지사별 소규모 PAT 풀로 분산</b> → 포트 소진·단일 IP 평판 오염 영향 축소</span>
+          <span>Microsoft 권고: 중앙 egress 1곳이면 <b>지역(regional) egress 포인트 추가</b>를 최적화 1순위로</span>
+        </div>
+      </div>
+      <div class="case">
+        <div class="head"><div class="ix">3</div><h3>규제 산업(금융·공공) — ExpressRoute는 "예외 승인"</h3><span class="ct">특수 요건</span></div>
+        <p>엄격한 인바운드·감사 요건 일부 기관이 사설 경로를 검토하나, Microsoft는 <b>ExpressRoute for M365를 권장하지 않으며 사례별 승인이 필요한 드문 예외</b>로 규정.</p>
+        <div class="eff">
+          <span>"고정 전용 경로 + 1:1 NAT 성향"은 <b>기본이 아니라 특수 요건일 때만</b> — 대부분은 인터넷 + split tunnel</span>
+        </div>
+      </div>
+      <div class="case">
+        <div class="head"><div class="ix">4</div><h3>중국(PRC) 사용자 — 의도적 백홀 + MPLS egress</h3><span class="ct">지정학적 예외</span></div>
+        <p>국경 간 혼잡으로 직접 egress가 불안정. 대부분 기업이 트래픽을 <b>사내망에 모은 뒤 인가된 MPLS로 역외 최적 경로 egress</b>.</p>
+        <div class="eff">
+          <span>egress 지점에 <b>소수 고정 공인 IP</b>가 모여 1:1/소수 PAT 성향 — "로컬 egress 원칙"의 예외</span>
+        </div>
+      </div>
+      <div class="case">
+        <div class="head"><div class="ix">5</div><h3>벤더별 표준 배포 — 업계가 실제 쓰는 도구</h3><span class="ct">검증된 구현체</span></div>
+        <p>Microsoft가 공식 연계 가이드를 제공할 만큼 광범위하게 쓰이는 조합 — 수많은 글로벌 기업이 이 스택으로 운영 중.</p>
+        <div class="eff">
+          <span><b>VPN split tunnel</b>: Cisco AnyConnect · Palo Alto GlobalProtect · F5 BIG-IP APM · Citrix Gateway · Check Point</span>
+          <span><b>클라우드 SWG</b>: Zscaler / Prisma에서도 Optimize 트래픽은 직접 송출 권고</span>
+          <span><b>자동화</b>: Endpoints 웹 서비스로 IP/URL 목록 자동 동기화 → 방화벽·PAC 갱신</span>
+        </div>
+      </div>
+    </div>
+    <blockquote><b>핵심 교훈</b>: 실제 답은 "1:1이냐 PAT냐"의 이분법이 아니라 — ① 트래픽 식별 → ② 로컬/지역 egress로 NAT 통과량 자체를 축소 → ③ 남는 트래픽만 PAT 풀로 분산하는 <b>단계적 최적화</b>. 1:1 NAT은 인바운드·규제·중국 같은 명시적 예외에서만 등장한다.</blockquote>
+  </section>
+
+  <!-- 요약 -->
+  <section>
+    <div class="eyebrow">요약</div>
+    <h2>시나리오별 권장</h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>시나리오</th><th>NAT 방식</th></tr></thead>
+        <tbody>
+          <tr><td>일반 대규모 M365 아웃바운드</td><td><span class="pill p-pat">PAT 풀</span> + 인스펙션 우회</td></tr>
+          <tr><td>Hybrid Exchange / 인바운드</td><td><span class="pill p-one">1:1 NAT</span></td></tr>
+          <tr><td>소수 IP 고정 시스템</td><td><span class="pill p-one">1:1 NAT</span></td></tr>
+          <tr><td>핵심 리스크</td><td>방식보다 <b>PAT 포트 사이징·세션 한계</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>출처: Microsoft 365 network connectivity principles / URLs &amp; IP ranges 가이드</footer>
+</div>
+
+<script>
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.style.width=e.target.dataset.w+'%';io.unobserve(e.target)}}),{threshold:.3});
+  document.querySelectorAll('.fill').forEach(f=>io.observe(f));
+</script>
+</body>
+</html>

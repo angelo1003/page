@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cisco ACI Floating L3Out 기술 가이드</title>
+<style>
+  :root{
+    --bg:#0a0e17; --bg-2:#0f1521; --panel:#121a28; --panel-2:#16202f;
+    --border:#243044; --border-2:#2e3c54;
+    --txt:#dce3ee; --txt-dim:#9fb0c6; --txt-faint:#6c7d96;
+    --accent:#16c7c1; --accent-2:#1ba0e2; --accent-3:#6f6cf6;
+    --ok:#22c98a; --warn:#f5b942; --danger:#f0556b; --info:#3aa0ff; --tip:#28d3a0;
+    --code-bg:#0b111c; --code-border:#1f2c40;
+    --shadow:0 10px 40px rgba(0,0,0,.45);
+    --mono:"SF Mono", "JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo",Roboto,"Noto Sans KR",sans-serif;
+    --sidebar-w:300px;
+  }
+  html[data-theme="light"]{
+    --bg:#eef2f7; --bg-2:#e6ecf3; --panel:#ffffff; --panel-2:#f5f8fc;
+    --border:#d4dde8; --border-2:#c2cfde;
+    --txt:#15212f; --txt-dim:#41546b; --txt-faint:#71839a;
+    --code-bg:#0b111c; --code-border:#1f2c40;
+    --shadow:0 8px 30px rgba(40,60,90,.12);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(22,199,193,.10), transparent 60%),
+      radial-gradient(1000px 500px at -10% 10%, rgba(111,108,246,.10), transparent 55%),
+      var(--bg);
+    color:var(--txt); font-family:var(--sans); font-size:16px; line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* progress bar */
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:60;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2),var(--accent-3));
+    box-shadow:0 0 12px rgba(22,199,193,.6);transition:width .1s ease-out}
+
+  /* layout */
+  .wrap{display:flex;max-width:1500px;margin:0 auto;gap:0}
+  /* sidebar */
+  .sidebar{
+    width:var(--sidebar-w);flex:0 0 var(--sidebar-w);position:sticky;top:0;height:100vh;
+    overflow-y:auto;padding:26px 18px 60px;border-right:1px solid var(--border);
+    background:linear-gradient(180deg,var(--bg-2),var(--bg));backdrop-filter:blur(6px);
+  }
+  .sidebar::-webkit-scrollbar{width:8px}
+  .sidebar::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:8px}
+  .brand{display:flex;align-items:center;gap:11px;margin-bottom:6px}
+  .brand .logo{width:38px;height:38px;border-radius:10px;flex:0 0 38px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    display:grid;place-items:center;font-weight:800;color:#04121a;font-size:18px;
+    box-shadow:0 6px 18px rgba(22,199,193,.35)}
+  .brand h1{font-size:15px;margin:0;line-height:1.25;font-weight:750;letter-spacing:.2px}
+  .brand .sub{font-size:11px;color:var(--txt-faint);margin-top:2px}
+  .side-meta{font-size:11px;color:var(--txt-faint);margin:14px 0 18px;padding:10px 12px;
+    border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+  .side-meta b{color:var(--accent)}
+  .toc-title{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;
+    color:var(--txt-faint);margin:18px 6px 8px;font-weight:700}
+  nav.toc a{
+    display:flex;align-items:center;gap:9px;padding:7px 11px;margin:2px 0;border-radius:8px;
+    color:var(--txt-dim);text-decoration:none;font-size:13.5px;font-weight:500;
+    border:1px solid transparent;transition:.15s;position:relative
+  }
+  nav.toc a .num{font-variant-numeric:tabular-nums;font-size:11px;color:var(--txt-faint);
+    width:20px;flex:0 0 20px;text-align:right;font-family:var(--mono)}
+  nav.toc a:hover{background:var(--panel);color:var(--txt);border-color:var(--border)}
+  nav.toc a.active{background:linear-gradient(90deg,rgba(22,199,193,.16),rgba(27,160,226,.06));
+    color:#fff;border-color:var(--border-2)}
+  nav.toc a.active .num{color:var(--accent)}
+  nav.toc a.active::before{content:"";position:absolute;left:-1px;top:8px;bottom:8px;width:3px;
+    border-radius:3px;background:linear-gradient(var(--accent),var(--accent-2))}
+
+  /* main */
+  main{flex:1 1 auto;min-width:0;padding:0 0 120px}
+  .topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:12px 30px;border-bottom:1px solid var(--border);
+    background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(10px)}
+  .topbar .crumb{font-size:12.5px;color:var(--txt-faint);flex:1 1 auto}
+  .topbar .crumb b{color:var(--txt-dim)}
+  .btn{display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1px solid var(--border);
+    background:var(--panel);color:var(--txt-dim);border-radius:9px;padding:7px 12px;font-size:12.5px;
+    font-weight:600;transition:.15s;font-family:inherit}
+  .btn:hover{color:var(--txt);border-color:var(--border-2);background:var(--panel-2)}
+  .search{display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--panel);
+    border-radius:9px;padding:6px 11px;min-width:200px}
+  .search input{background:transparent;border:0;outline:0;color:var(--txt);font-size:13px;width:100%;font-family:inherit}
+  .search svg{flex:0 0 14px;opacity:.6}
+
+  .content{max-width:980px;margin:0 auto;padding:0 30px}
+
+  /* hero */
+  .hero{margin:40px 0 30px;padding:38px 34px;border-radius:20px;position:relative;overflow:hidden;
+    border:1px solid var(--border);
+    background:
+      radial-gradient(700px 240px at 90% -30%, rgba(27,160,226,.22), transparent 60%),
+      radial-gradient(600px 240px at 0% 120%, rgba(111,108,246,.18), transparent 55%),
+      linear-gradient(160deg,var(--panel-2),var(--panel))}
+  .hero::after{content:"";position:absolute;inset:0;
+    background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:34px 34px;opacity:.10;mask-image:radial-gradient(600px 300px at 80% 0%,#000,transparent)}
+  .hero .eyebrow{position:relative;z-index:1;display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;
+    letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);
+    border:1px solid var(--border-2);border-radius:999px;padding:5px 13px;background:rgba(22,199,193,.07)}
+  .hero h2{position:relative;z-index:1;font-size:38px;line-height:1.15;margin:18px 0 10px;font-weight:800;letter-spacing:-.5px}
+  .hero h2 .grad{background:linear-gradient(100deg,var(--accent),var(--accent-2) 55%,var(--accent-3));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lead{position:relative;z-index:1;color:var(--txt-dim);font-size:16px;max-width:680px;margin:0 0 20px}
+  .hero .chips{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:9px}
+  .chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--txt-dim);
+    border:1px solid var(--border);background:var(--panel);border-radius:999px;padding:6px 13px}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  .chip.v .dot{background:var(--accent-2)} .chip.a .dot{background:var(--accent-3)} .chip.u .dot{background:var(--warn)}
+
+  /* meta cards row */
+  .meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:22px 0 8px}
+  .meta-card{border:1px solid var(--border);border-radius:14px;padding:16px 18px;background:var(--panel);
+    position:relative;overflow:hidden}
+  .meta-card .k{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--txt-faint);font-weight:700}
+  .meta-card .v{font-size:15px;color:var(--txt);margin-top:6px;font-weight:650}
+  .meta-card .v small{color:var(--txt-dim);font-weight:500}
+  .meta-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:linear-gradient(var(--accent),var(--accent-2))}
+
+  /* sections */
+  section{scroll-margin-top:70px;margin:54px 0}
+  section > h2.sec{font-size:27px;font-weight:780;letter-spacing:-.3px;margin:0 0 6px;display:flex;align-items:center;gap:14px}
+  section > h2.sec .idx{font-family:var(--mono);font-size:15px;font-weight:700;color:#04121a;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));border-radius:9px;
+    min-width:34px;height:34px;display:grid;place-items:center;flex:0 0 auto;box-shadow:0 4px 14px rgba(22,199,193,.3)}
+  .sec-rule{height:1px;background:linear-gradient(90deg,var(--border-2),transparent);margin:14px 0 22px}
+  h3.sub{font-size:18.5px;font-weight:700;margin:30px 0 10px;color:var(--txt);
+    padding-left:13px;border-left:3px solid var(--accent);line-height:1.3}
+  h4.subsub{font-size:15px;font-weight:700;margin:22px 0 8px;color:var(--accent-2)}
+  p{margin:12px 0}
+  a{color:var(--accent-2);text-decoration:none;border-bottom:1px dashed transparent}
+  a:hover{border-bottom-color:var(--accent-2)}
+  strong{color:#fff;font-weight:700}
+  html[data-theme="light"] strong{color:#0a1622}
+  em{color:var(--txt-dim);font-style:italic}
+  ul,ol{margin:12px 0;padding-left:22px}
+  li{margin:7px 0}
+  li::marker{color:var(--accent)}
+
+  /* inline code */
+  code.inl{font-family:var(--mono);font-size:.86em;background:var(--code-bg);color:#7fe9d8;
+    border:1px solid var(--code-border);border-radius:6px;padding:1.5px 6px;white-space:nowrap}
+
+  /* code blocks */
+  .code{position:relative;margin:18px 0;border:1px solid var(--code-border);border-radius:13px;overflow:hidden;
+    background:var(--code-bg);box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)}
+  .code .bar{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--code-border);
+    background:linear-gradient(180deg,#0e1726,#0a111d)}
+  .code .bar .dots{display:flex;gap:6px;margin-right:6px}
+  .code .bar .dots i{width:11px;height:11px;border-radius:50%;display:block}
+  .code .bar .dots i:nth-child(1){background:#ff5f57} .code .bar .dots i:nth-child(2){background:#febc2e} .code .bar .dots i:nth-child(3){background:#28c840}
+  .code .bar .lang{font-family:var(--mono);font-size:11px;letter-spacing:.5px;color:var(--txt-faint);
+    text-transform:uppercase;font-weight:700}
+  .code .bar .copy{margin-left:auto;cursor:pointer;border:1px solid var(--code-border);background:#0c1320;
+    color:var(--txt-dim);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;font-family:var(--sans);transition:.15s}
+  .code .bar .copy:hover{color:#fff;border-color:var(--border-2)}
+  .code .bar .copy.done{color:var(--ok);border-color:var(--ok)}
+  .code pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.65;color:#cdd9ea}
+  .code pre::-webkit-scrollbar{height:9px} .code pre::-webkit-scrollbar-thumb{background:#243044;border-radius:8px}
+  /* diagram block (ascii) */
+  .diagram pre{color:#8fd4ff;font-size:12.5px;line-height:1.5;letter-spacing:0}
+  .diagram .bar .lang::after{content:" · topology"}
+  /* token coloring (manual spans) */
+  .t-tag{color:#6f9bff} .t-attr{color:#7fe9d8} .t-str{color:#f5b97a} .t-cmt{color:#5c7088;font-style:italic}
+  .t-kw{color:#c98bdb} .t-num{color:#8fe0a0} .t-prompt{color:#22c98a}
+
+  /* tables */
+  .tbl-wrap{margin:18px 0;border:1px solid var(--border);border-radius:13px;overflow:auto;box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+  thead th{background:linear-gradient(180deg,var(--panel-2),var(--panel));color:var(--txt);
+    text-align:left;font-weight:700;padding:12px 15px;border-bottom:1px solid var(--border-2);
+    position:sticky;top:0;white-space:nowrap;font-size:12.5px;letter-spacing:.2px}
+  tbody td{padding:11px 15px;border-bottom:1px solid var(--border);color:var(--txt-dim);vertical-align:top}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:nth-child(even){background:rgba(255,255,255,.015)}
+  tbody tr:hover{background:rgba(22,199,193,.05)}
+  td strong,th strong{color:#fff}
+  html[data-theme="light"] td strong{color:#0a1622}
+  .center{text-align:center}
+  .ver{font-family:var(--mono);font-weight:700;color:var(--accent);font-size:12.5px;white-space:nowrap}
+  .yes{color:var(--ok);font-weight:700} .no{color:var(--danger);font-weight:700}
+
+  /* callouts */
+  .callout{display:flex;gap:14px;margin:18px 0;padding:15px 18px;border-radius:13px;border:1px solid var(--border);
+    background:var(--panel);position:relative;overflow:hidden}
+  .callout::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .callout .ico{flex:0 0 26px;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:15px;font-weight:800}
+  .callout .body{flex:1;min-width:0}
+  .callout .body p{margin:4px 0}
+  .callout .lbl{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+  .callout.note{background:linear-gradient(100deg,rgba(58,160,255,.10),transparent 70%)}
+  .callout.note::before{background:var(--info)} .callout.note .ico{background:rgba(58,160,255,.16);color:var(--info)} .callout.note .lbl{color:var(--info)}
+  .callout.tip{background:linear-gradient(100deg,rgba(40,211,160,.10),transparent 70%)}
+  .callout.tip::before{background:var(--tip)} .callout.tip .ico{background:rgba(40,211,160,.16);color:var(--tip)} .callout.tip .lbl{color:var(--tip)}
+  .callout.warn{background:linear-gradient(100deg,rgba(245,185,66,.10),transparent 70%)}
+  .callout.warn::before{background:var(--warn)} .callout.warn .ico{background:rgba(245,185,66,.16);color:var(--warn)} .callout.warn .lbl{color:var(--warn)}
+  .callout.danger{background:linear-gradient(100deg,rgba(240,85,107,.10),transparent 70%)}
+  .callout.danger::before{background:var(--danger)} .callout.danger .ico{background:rgba(240,85,107,.16);color:var(--danger)} .callout.danger .lbl{color:var(--danger)}
+
+  /* term cards */
+  .terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin:18px 0}
+  .term{border:1px solid var(--border);border-radius:13px;padding:16px 17px;background:var(--panel);transition:.18s}
+  .term:hover{border-color:var(--border-2);transform:translateY(-2px);box-shadow:var(--shadow)}
+  .term .t{font-weight:750;color:#fff;font-size:14.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+  html[data-theme="light"] .term .t{color:#0a1622}
+  .term .t .pill{font-size:10px;font-family:var(--mono);font-weight:700;padding:2px 7px;border-radius:6px}
+  .pill.anchor{background:rgba(22,199,193,.16);color:var(--accent)}
+  .pill.nonanchor{background:rgba(111,108,246,.16);color:#a9a7ff}
+  .term .d{font-size:13px;color:var(--txt-dim);line-height:1.6}
+
+  /* IP role cards */
+  .iprow{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:13px;margin:18px 0}
+  .ipc{border:1px solid var(--border);border-radius:13px;padding:15px;background:var(--panel);position:relative}
+  .ipc .tag{font-size:10.5px;font-weight:700;letter-spacing:.5px;padding:3px 9px;border-radius:999px;display:inline-block;margin-bottom:9px}
+  .ipc.req .tag{background:rgba(240,85,107,.15);color:var(--danger)}
+  .ipc.opt .tag{background:rgba(245,185,66,.15);color:var(--warn)}
+  .ipc h5{margin:0 0 4px;font-size:14.5px;color:#fff;font-weight:750}
+  html[data-theme="light"] .ipc h5{color:#0a1622}
+  .ipc .loc{font-size:11.5px;color:var(--accent-2);font-family:var(--mono);margin-bottom:8px}
+  .ipc p{font-size:12.5px;color:var(--txt-dim);margin:0}
+
+  /* steps */
+  .steps{counter-reset:st;margin:18px 0;padding:0;list-style:none}
+  .steps>li{counter-increment:st;position:relative;padding:4px 0 18px 46px;margin:0}
+  .steps>li::before{content:counter(st);position:absolute;left:0;top:0;width:30px;height:30px;border-radius:9px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04121a;font-weight:800;font-size:14px;
+    display:grid;place-items:center;box-shadow:0 4px 12px rgba(22,199,193,.3)}
+  .steps>li::after{content:"";position:absolute;left:14px;top:32px;bottom:2px;width:2px;background:var(--border)}
+  .steps>li:last-child::after{display:none}
+  .steps>li .stt{font-weight:700;color:#fff;font-size:14.5px}
+  html[data-theme="light"] .steps>li .stt{color:#0a1622}
+  .steps>li ul{margin:8px 0}
+
+  /* checklist */
+  .check{list-style:none;padding:0;margin:18px 0;display:grid;gap:8px}
+  .check li{display:flex;gap:11px;align-items:flex-start;padding:11px 14px;border:1px solid var(--border);
+    border-radius:10px;background:var(--panel);font-size:13.5px;color:var(--txt-dim);cursor:pointer;transition:.15s}
+  .check li:hover{border-color:var(--border-2);background:var(--panel-2)}
+  .check li .box{flex:0 0 19px;width:19px;height:19px;border-radius:6px;border:2px solid var(--border-2);
+    display:grid;place-items:center;margin-top:1px;transition:.15s;font-size:12px;color:transparent}
+  .check li.done .box{background:var(--ok);border-color:var(--ok);color:#04121a}
+  .check li.done{color:var(--txt-faint)}
+  .check li.done span.tx{text-decoration:line-through}
+
+  /* badges inline */
+  .bdg{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;
+    border:1px solid var(--border-2);color:var(--accent);background:rgba(22,199,193,.08);vertical-align:middle}
+  .bdg.rel{color:var(--accent-2);background:rgba(27,160,226,.08)}
+
+  /* footer */
+  footer{max-width:980px;margin:60px auto 0;padding:26px 30px;border-top:1px solid var(--border);
+    color:var(--txt-faint);font-size:12.5px}
+  footer .disc{padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--panel);
+    color:var(--txt-dim);margin-bottom:16px}
+
+  /* back to top */
+  #toTop{position:fixed;right:24px;bottom:24px;z-index:50;width:46px;height:46px;border-radius:13px;cursor:pointer;
+    border:1px solid var(--border-2);background:var(--panel);color:var(--accent);display:grid;place-items:center;
+    box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.25s;font-size:18px}
+  #toTop.show{opacity:1;pointer-events:auto}
+  #toTop:hover{background:var(--panel-2);transform:translateY(-3px)}
+
+  .mobile-toggle{display:none}
+  /* responsive */
+  @media(max-width:1080px){
+    .sidebar{position:fixed;left:0;top:0;z-index:70;transform:translateX(-100%);transition:transform .25s;box-shadow:var(--shadow)}
+    .sidebar.open{transform:translateX(0)}
+    .mobile-toggle{display:inline-flex}
+    .hero h2{font-size:30px}
+    .search{min-width:auto}
+  }
+  @media(max-width:680px){
+    .content,.topbar{padding-left:16px;padding-right:16px}
+    .hero{padding:26px 20px} .hero h2{font-size:25px}
+    section>h2.sec{font-size:22px}
+    .topbar .crumb{display:none}
+    .search input{width:120px}
+  }
+  /* scrim */
+  #scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:65;opacity:0;pointer-events:none;transition:.25s}
+  #scrim.show{opacity:1;pointer-events:auto}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="scrim"></div>
+<div class="wrap">
+<!--SIDEBAR-->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="logo">F</div>
+    <div>
+      <h1>ACI Floating L3Out</h1>
+      <div class="sub">기술 아키텍처 가이드</div>
+    </div>
+  </div>
+  <div class="side-meta">
+    <div>기준 릴리스 · <b>APIC 4.2(1) ~ 6.1(2)</b></div>
+    <div style="margin-top:5px">대상 · 네트워크 아키텍트 / 엔지니어</div>
+  </div>
+  <div class="toc-title">목차 · Contents</div>
+  <nav class="toc" id="toc">
+    <a href="#s1"><span class="num">01</span> 개요와 해결하는 문제</a>
+    <a href="#s2"><span class="num">02</span> 핵심 개념과 용어</a>
+    <a href="#s3"><span class="num">03</span> 4가지 IP 주소의 역할</a>
+    <a href="#s4"><span class="num">04</span> 지원 시나리오</a>
+    <a href="#s5"><span class="num">05</span> VMM vs Physical</a>
+    <a href="#s6"><span class="num">06</span> 요구사항 / 버전</a>
+    <a href="#s7"><span class="num">07</span> Control / Data Plane</a>
+    <a href="#s8"><span class="num">08</span> Suboptimal 경로 회피</a>
+    <a href="#s9"><span class="num">09</span> 설정 예제</a>
+    <a href="#s10"><span class="num">10</span> Multiple Encapsulation</a>
+    <a href="#s11"><span class="num">11</span> 제약사항</a>
+    <a href="#s12"><span class="num">12</span> Best Practice</a>
+    <a href="#s13"><span class="num">13</span> 참고 문서</a>
+  </nav>
+</aside>
+
+<main>
+  <div class="topbar">
+    <button class="btn mobile-toggle" id="menuBtn" aria-label="menu">☰</button>
+    <div class="crumb"><b>Cisco ACI</b> &nbsp;›&nbsp; External Connectivity &nbsp;›&nbsp; Floating L3Out</div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="searchInput" type="text" placeholder="문서 내 검색…" />
+    </div>
+    <button class="btn" id="themeBtn" title="테마 전환">🌙 <span id="themeLbl">Dark</span></button>
+  </div>
+
+  <div class="content" id="content">
+    <!--HERO-->
+    <div class="hero">
+      <span class="eyebrow">◆ Cisco Application Centric Infrastructure</span>
+      <h2>Floating <span class="grad">L3Out</span> 기술 가이드</h2>
+      <p class="lead">가상 라우터·방화벽이 하이퍼바이저 클러스터 위에서 leaf 간 이동해도, leaf마다 logical interface를 수동 설정하지 않고 외부 L3 연동을 유지하는 ACI 기능. 설계·구성·동작·제약을 아키텍트 관점에서 정리한다.</p>
+      <div class="chips">
+        <span class="chip"><span class="dot"></span> Anchor / Non-Anchor</span>
+        <span class="chip v"><span class="dot"></span> Floating SVI</span>
+        <span class="chip a"><span class="dot"></span> Next-Hop Propagation</span>
+        <span class="chip u"><span class="dot"></span> VMM &amp; Physical Domain</span>
+      </div>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-card"><div class="k">최초 도입</div><div class="v">APIC 4.2(1) <small>· VMware VDS</small></div></div>
+      <div class="meta-card"><div class="k">Physical Domain</div><div class="v">APIC 5.0(1) <small>이상</small></div></div>
+      <div class="meta-card"><div class="k">검증 스케일 (6.0.1)</div><div class="v">Anchor 6 <small>/</small> Non-Anchor 32</div></div>
+      <div class="meta-card"><div class="k">필수 HW</div><div class="v">Gen2 Leaf <small>switch</small></div></div>
+    </div>
+
+    <div class="callout note">
+      <div class="ico">i</div>
+      <div class="body">
+        <div class="lbl">출처</div>
+        <p>본 문서는 Cisco 공식 <strong>Configuration Guide</strong> 및 <strong>White Paper</strong>를 기반으로 작성되었다. 설명은 한국어로, 기술 용어·CLI·REST API는 Cisco 원문(영문)을 유지한다. 전체 출처는 <a href="#s13">13. 참고 문서</a> 참조.</p>
+      </div>
+    </div>
+
+<!--SECTIONS-->
+
+<!-- ============ 1 ============ -->
+<section id="s1">
+  <h2 class="sec"><span class="idx">01</span> 개요와 해결하는 문제</h2>
+  <div class="sec-rule"></div>
+
+  <h3 class="sub">1.1 전통적(Regular) L3Out의 한계</h3>
+  <p>ACI에서 외부 라우터/방화벽과 L3 라우팅 연동을 하려면 <strong>L3Out</strong>을 구성하고, 그 안에 <strong>Logical Interface Profile</strong>을 통해 <em>border leaf의 물리 포트 → 외부 장비</em>로 향하는 <strong>logical interface path</strong>를 명시해야 한다.</p>
+  <p>문제는 외부 장비가 <strong>가상 라우터/가상 방화벽</strong>이고, 하이퍼바이저 클러스터 위에서 동작할 때 발생한다. VMware DRS, vMotion, HA 등에 의해 VM이 임의의 호스트(= 임의의 leaf)로 이동할 수 있기 때문이다.</p>
+  <ul>
+    <li>VM이 옮겨갈 수 있는 <strong>모든 leaf</strong>에 대해 logical interface path를 <strong>사전에 전부 수동 설정</strong>해야 한다.</li>
+    <li>예: 하이퍼바이저 클러스터가 12개 leaf에 걸쳐 있으면, 12개 leaf 각각에 대해 L3Out logical interface를 만들어야 한다.</li>
+    <li>L3Out SVI와 VLAN 프로그래밍이 <strong>자동화되지 않으므로</strong> 설정량이 폭증하고, 외부 장비와의 <strong>routing peering 세션 수</strong>도 leaf 수만큼 증가한다.</li>
+  </ul>
+
+  <div class="code diagram">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">전통적 L3Out 문제</span><button class="copy">복사</button></div>
+<pre>         VM(vRouter)가 어디로든 이동 가능
+                    │
+   ┌──────┬──────┬──────┬─── ... ──┬──────┐
+ Leaf1  Leaf2  Leaf3  Leaf4       Leaf12
+   │      │      │      │            │
+   └─ 모든 leaf에 logical interface + SVI + peering 수동 설정 필요 (12x) ─┘</pre>
+  </div>
+
+  <h3 class="sub">1.2 Floating L3Out이 제공하는 것</h3>
+  <p>Cisco ACI <span class="bdg rel">4.2(1)</span>부터 도입된 Floating L3Out은 <strong>개별 leaf마다 L3Out logical interface를 명시하지 않고</strong> L3Out을 구성할 수 있게 한다. 핵심 가치는 두 가지다.</p>
+  <div class="terms">
+    <div class="term"><div class="t">① 설정 단순화</div><div class="d">VM이 이동해도 leaf마다 logical interface를 다시 만들 필요가 없다. APIC가 SVI / VLAN / floating IP를 <strong>자동으로</strong> 해당 leaf에 프로그래밍한다.</div></div>
+    <div class="term"><div class="t">② Peering Scale 절감</div><div class="d">오직 지정된 소수의 leaf(<strong>anchor leaf node</strong>)만 외부 라우터와 routing adjacency를 맺는다. ACI leaf 측과 외부 장비 측 모두 peering 부담이 줄어든다.</div></div>
+  </div>
+  <div class="callout note">
+    <div class="ico">📌</div>
+    <div class="body"><div class="lbl">도입 타임라인</div>
+    <p>4.2(1)은 <strong>VMware vSphere Distributed Switch(VDS) 기반 VMM 도메인</strong>만 지원했고, <span class="bdg rel">5.0(1)</span>부터 <strong>Physical Domain</strong>까지 확장되어 <em>VMM 통합이 없는 가상 라우터</em>나 <em>물리 라우터</em> 연결에도 사용할 수 있게 되었다.</p></div>
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="s2">
+  <h2 class="sec"><span class="idx">02</span> 핵심 개념과 용어</h2>
+  <div class="sec-rule"></div>
+  <div class="terms">
+    <div class="term"><div class="t">Virtual Router</div><div class="d">ACI fabric에서 static route의 next-hop이 되거나 routing adjacency를 맺는 가상 라우터 / 가상 방화벽 등. <strong>이동 대상</strong>이 되는 외부 장비.</div></div>
+    <div class="term"><div class="t">Anchor Leaf Node <span class="pill anchor">ANCHOR</span></div><div class="d">외부 라우터와 <strong>실제로 L3 adjacency(BGP/OSPF) 또는 static next-hop 종단</strong>을 맺는 leaf. Primary IP / Floating IP 사용(필요 시 secondary). <strong>6.0(1) 기준 L3Out당 검증 스케일 = 6</strong>.</div></div>
+    <div class="term"><div class="t">Non-Anchor Leaf Node <span class="pill nonanchor">NON-ANCHOR</span></div><div class="d">외부 라우터와 adjacency를 맺지 <strong>않는</strong> leaf. anchor로 향하는 트래픽의 <strong>"pass-through"</strong> 역할. Floating IP(및 floating secondary IP)만 사용. <strong>6.0(1) 기준 L3Out당 검증 스케일 = 32</strong>.</div></div>
+    <div class="term"><div class="t">Floating SVI</div><div class="d">anchor / non-anchor에 공통으로 프로그래밍되는 L3 인터페이스. <strong>동일 MAC</strong>을 모든 leaf에 심어, 외부 라우터가 어느 leaf 밑에 있어도 그 leaf가 직접 fabric으로 라우팅하게 한다.</div></div>
+    <div class="term"><div class="t">External Bridge Domain<br><small style="color:var(--txt-faint)">(L3Out's SVI subnet)</small></div><div class="d">L3Out 구성 시 anchor node에 생성되는 BD. 동일 VLAN encap을 쓰면 같은 VNID로 매핑되어 <strong>anchor ↔ non-anchor 간 L2가 확장</strong>된다.</div></div>
+  </div>
+
+  <h3 class="sub">2.1 토폴로지 개념도</h3>
+  <div class="code diagram">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">floating l3out</span><button class="copy">복사</button></div>
+<pre>                         ┌──────────────────────────┐
+                         │      ACI Spine            │
+                         └───┬───────┬───────┬───────┘
+                             │       │       │
+        ┌────────────────────┼───────┼───────┼─────────────────────┐
+        │                    │       │       │                     │
+   ┌────┴────┐         ┌─────┴───┐ ┌─┴───────┴─┐            ┌───────┴───┐
+   │ Leaf1   │  vPC    │ Leaf2   │ │  Leaf3    │            │  Leaf4    │
+   │ ANCHOR  ├─────────┤ ANCHOR  │ │ NON-ANCHOR│            │ NON-ANCHOR│
+   │Primary  │         │Primary  │ │Floating IP│            │Floating IP│
+   │+Floating│         │+Floating│ │           │            │           │
+   └────┬────┘         └────┬────┘ └─────┬─────┘            └─────┬─────┘
+        │  ▲ BGP/OSPF       │            │ (peering 없음)         │
+        └──┤ adjacency ┌────┘            │                        │
+           │           │            ┌────┴────┐              ┌────┴────┐
+        ┌──┴───────────┴──┐         │ Host3   │              │ Host4   │
+        │ External Router │         │(vRouter │              │ (Web EP)│
+        │  (vRouter/FW)   │ ──이동──▶│ 이동 후)│              │         │
+        └─────────────────┘         └─────────┘              └─────────┘</pre>
+  </div>
+  <ul>
+    <li><strong>이동 전</strong>: 외부 라우터가 anchor(Leaf1/Leaf2)에 직접 연결 → adjacency 정상.</li>
+    <li><strong>이동 후</strong>: 외부 라우터가 non-anchor(Leaf3)로 이동 → APIC가 Leaf3에 External BD / Floating IP / contract 룰 / route를 자동 프로그래밍. <strong>adjacency는 여전히 anchor의 SVI와 유지</strong>된다(External BD가 anchor~non-anchor에 걸쳐 확장되어 있기 때문).</li>
+  </ul>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="s3">
+  <h2 class="sec"><span class="idx">03</span> 4가지 IP 주소의 역할</h2>
+  <div class="sec-rule"></div>
+  <p>Floating L3Out의 SVI에는 최대 <strong>4종류의 IP</strong>가 관여한다. 이 구분이 설계의 핵심이다.</p>
+  <div class="iprow">
+    <div class="ipc req"><span class="tag">REQUIRED</span><h5>Primary IP</h5><div class="loc">각 anchor node · unique</div><p>해당 anchor SVI의 실제 IP. 외부 라우터와의 <strong>L3Out peering adjacency 종단</strong>.</p></div>
+    <div class="ipc opt"><span class="tag">OPTIONAL</span><h5>Secondary IP</h5><div class="loc">anchor node</div><p>① anchor들이 공유하는 <strong>virtual IP</strong>(static routing 시 외부 장비의 next-hop gateway) ② secondary subnet용 unique/공유 IP.</p></div>
+    <div class="ipc req"><span class="tag">REQUIRED</span><h5>Floating (Primary) IP</h5><div class="loc">anchor + non-anchor 공통</div><p>모든 leaf에 <strong>동일 MAC</strong>으로 심어지는 L3 인터페이스. ARP resolution 및 외부→fabric 직접 포워딩에 사용.</p></div>
+    <div class="ipc opt"><span class="tag">OPTIONAL</span><h5>Floating Secondary IP</h5><div class="loc">anchor + non-anchor 공통</div><p>동일 External BD(SVI)에서 <strong>복수 subnet</strong>을 쓸 때만. 외부 통신용으로는 사용하지 않음.</p></div>
+  </div>
+  <div class="callout warn">
+    <div class="ico">⚠</div>
+    <div class="body"><div class="lbl">설계 규칙</div><p>Primary IP와 Floating Primary IP는 <strong>반드시 동일 subnet</strong>에 속해야 한다.</p></div>
+  </div>
+
+  <h3 class="sub">3.1 IP 주소 배치 예시 (Cisco 문서 기준)</h3>
+  <div class="code diagram">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">ip addressing</span><button class="copy">복사</button></div>
+<pre>External BD VLAN encap = vlan-X,  Subnet 172.16.1.0/24
+
+Leaf1 (anchor)   Primary        : 172.16.1.251/24
+Leaf2 (anchor)   Primary        : 172.16.1.252/24
+Leaf1/Leaf2      Secondary(공유) : 172.16.1.254/24   ← 외부 장비 static route next-hop
+ALL leaf         Floating        : 172.16.1.250/24   ← ARP resolution, 동일 MAC
+
+[추가 subnet이 같은 SVI VLAN에 필요할 때]
+Secondary         : 172.16.2.254
+Floating secondary: 172.16.2.250</pre>
+  </div>
+  <ul>
+    <li>외부 장비는 fabric 내부 subnet(예: <code class="inl">192.168.1.0/24</code>)으로 가는 static route의 <strong>next-hop을 <code class="inl">172.16.1.254</code>(secondary 공유 IP)</strong>로 설정.</li>
+    <li>non-anchor leaf도 floating IP(<code class="inl">172.16.1.254</code> next-hop과 동일 MAC)를 인스턴스화하므로, 외부 라우터가 non-anchor 밑으로 이동해도 <strong>그 leaf가 직접</strong> 트래픽을 라우팅한다.</li>
+  </ul>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="s4">
+  <h2 class="sec"><span class="idx">04</span> 지원 시나리오 (Use Cases)</h2>
+  <div class="sec-rule"></div>
+  <div class="callout tip"><div class="ico">✓</div><div class="body"><p>아래 모든 시나리오에서 <strong>Floating L3Out 설정 방법 자체는 동일</strong>하다.</p></div></div>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:30%">시나리오</th><th>설명</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Physical Domain</strong><br><small>물리 라우터</small></td><td>물리 라우터는 leaf 간 이동을 하지 않지만, 외부 라우터가 연결될 수 있는 모든 leaf에 logical interface를 안 만들어도 되어 <strong>설정이 단순화</strong>된다.</td></tr>
+      <tr><td><strong>하이퍼바이저 클러스터</strong><br><small>가상 FW/라우터</small></td><td>DRS 등으로 자원 스케줄링이 동적으로 일어남 → VM hosting 경계가 단일 호스트가 아니라 <strong>클러스터 전체</strong>가 된다.</td></tr>
+      <tr><td><strong>HA(고가용성)</strong><br><small>가상 FW/라우터</small></td><td>하이퍼바이저 HA(예: VMware HA)가 실패한 VM을 클러스터 내 임의 호스트에서 재기동. (FW 자체 active/active · active/standby와는 별개의 추가 보호장치)</td></tr>
+      <tr><td><strong>ECMP 로드밸런싱</strong></td><td>여러 외부 라우터를 서로 다른 leaf에 연결하면서도 각 leaf에 logical interface 설정이 불필요.</td></tr>
+      <tr><td><strong>Maintenance Mode</strong></td><td>하이퍼바이저 업그레이드 시 호스트 evacuation(= FW/라우터 VM live migration).</td></tr>
+      <tr><td><strong>Disaster Avoidance</strong></td><td>Stretched cluster에서 장애 예상 노드의 VM을 다른 호스트로 사전 이전.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+<!-- ============ 5 ============ -->
+<section id="s5">
+  <h2 class="sec"><span class="idx">05</span> 도메인 유형: VMM vs Physical</h2>
+  <div class="sec-rule"></div>
+  <p>Floating L3Out은 <strong>VMM Domain</strong>과 <strong>Physical Domain</strong> 두 가지로 배포할 수 있으며, 동작 / 기능 지원에 차이가 있다.</p>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:30%">항목</th><th>VMM Domain (VMware VDS)</th><th>Physical Domain</th></tr></thead>
+    <tbody>
+      <tr><td><strong>최초 지원 릴리스</strong></td><td><span class="ver">4.2(1)</span></td><td><span class="ver">5.0(1)</span></td></tr>
+      <tr><td><strong>Floating IP 배포 트리거</strong></td><td>생성된 port-group에 vRouter가 연결되면 그 leaf에 SVI/floating IP가 <strong>동적</strong>으로 deploy<br>(resolution=on-demand, deployment=immediate)</td><td>해당 leaf 포트가 floating L3Out에 연결된 <strong>L3Out domain을 가진 AEP</strong>를 쓰면 floating IP deploy</td></tr>
+      <tr><td><strong>Port-group 자동 생성</strong></td><td><code class="inl">&lt;Tenant&gt; | &lt;L3Out&gt; | &lt;VLAN&gt;</code> 이름으로 VDS에 자동 생성. 관리자가 vRouter vNIC을 연결</td><td>해당 없음</td></tr>
+      <tr><td><strong>Next-Hop Propagation</strong><br><small>(Suboptimal 회피)</small></td><td><span class="no">✗ 미지원</span></td><td><span class="yes">✓ 지원</span></td></tr>
+      <tr><td><strong>Direct-attached host route advertising</strong></td><td><span class="no">✗ 미지원</span></td><td><span class="yes">✓ 지원</span></td></tr>
+      <tr><td><strong>Multiple Encapsulation</strong><br><small>(단일 BD, 다른 VLAN)</small></td><td><span class="no">✗ 미지원</span> <small>(6.0.1 기준)</small></td><td><span class="yes">✓ 지원</span></td></tr>
+      <tr><td><strong>Secondary floating IP</strong></td><td><span class="yes">✓</span> <small>5.0(1)부터</small></td><td><span class="yes">✓ 지원</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout tip">
+    <div class="ico">💡</div>
+    <div class="body"><div class="lbl">선택 가이드</div><p><strong>Suboptimal 경로 회피, Multi-Encap 등 고급 기능이 필요하면 반드시 Physical Domain</strong>을 사용해야 한다. VMM Domain은 port-group 자동화 / 동적 deploy가 장점이지만 고급 라우팅 최적화 기능은 지원하지 않는다.</p></div>
+  </div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="s6">
+  <h2 class="sec"><span class="idx">06</span> 요구사항 (HW / SW / 버전 히스토리)</h2>
+  <div class="sec-rule"></div>
+
+  <h3 class="sub">6.1 하드웨어 요구사항</h3>
+  <div class="callout danger"><div class="ico">!</div><div class="body"><div class="lbl">Gen2 Leaf 필수</div>
+    <p><strong>Generation 2 leaf switch 필수</strong>. Gen1 스위치는 anchor / non-anchor로 <strong>사용 불가</strong>. 단, Gen1 스위치를 <strong>non-border leaf(compute leaf)</strong>로는 사용할 수 있다.</p></div></div>
+
+  <h3 class="sub">6.2 소프트웨어 / 구성 요구사항</h3>
+  <ul>
+    <li><strong>VLAN Pool</strong>: floating L3Out용으로 <strong>static VLAN range</strong>를 가진 VLAN pool이 필요.
+      <ul><li>VMM Domain 사용 시, <strong>L3Out domain의 VLAN pool과 VMM domain의 VLAN pool 범위가 동일</strong>해야 한다 (예: 양쪽 모두 <code class="inl">200-209</code>).</li></ul></li>
+    <li><strong>MTU</strong>: 1500 ~ 9216. <code class="inl">inherit</code> 지정 시 Fabric L2 MTU policy 값을 상속. 기본값 9000.</li>
+  </ul>
+
+  <h3 class="sub">6.3 기능별 버전 히스토리</h3>
+  <p style="color:var(--txt-faint);font-size:13px">Cisco "New and Changed Information" 표 기준</p>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th class="center" style="width:110px">APIC 릴리스</th><th style="width:34%">기능</th><th>설명</th></tr></thead>
+    <tbody>
+      <tr><td class="center"><span class="ver">4.2(1)</span></td><td><strong>Floating L3Out for VMware VDS</strong></td><td>logical interface 정의 없이 L3Out 구성. 가상 장비가 leaf 간 이동 가능. <em>(최초 도입)</em></td></tr>
+      <tr><td class="center"><span class="ver">5.0(1)</span></td><td>Physical Domain 지원</td><td>VMM 통합 없는 가상 라우터 / 물리 라우터 연결.</td></tr>
+      <tr><td class="center"><span class="ver">5.0(1)</span></td><td>Secondary IP / Floating Secondary IP</td><td>anchor 공유 IP, 동일 floating SVI에 추가 subnet.</td></tr>
+      <tr><td class="center"><span class="ver">5.0(1)</span></td><td>Suboptimal 경로 회피</td><td>Next-hop propagation + direct-attached host route advertising <em>(이 시점엔 BGP only)</em>.</td></tr>
+      <tr><td class="center"><span class="ver">5.2(1)</span></td><td>Next-hop propagation → OSPF / static</td><td>OSPF · static route를 BGP로 redistribution 시에도 next-hop propagation 가능.</td></tr>
+      <tr><td class="center"><span class="ver">5.2(1)</span></td><td>Multi-protocol Recursive Route Resolution</td><td>loopback 기반 recursive lookup으로 ECMP 활용 / 다중 next-hop redistribution.</td></tr>
+      <tr><td class="center"><span class="ver">5.2(3)</span></td><td>Multiple Encapsulation</td><td>단일 L3Out SVI/BD를 leaf마다 다른 VLAN encap으로 배포 (단일 L2 도메인).</td></tr>
+      <tr><td class="center"><span class="ver">5.2(4)</span></td><td>IPv4/IPv6 동일 encap (VMM)</td><td>동일 VLAN encap으로 IPv4/IPv6 floating SVI를 하나의 port-group에 배포.</td></tr>
+      <tr><td class="center"><span class="ver">6.1(2)</span></td><td>eBGP multipath &amp; addpath (fabric 내)</td><td>eBGP peering을 forwarding node까지 확장, 모든 unique next-hop을 fabric에 publish.</td></tr>
+      <tr><td class="center"><span class="ver">6.1(2)</span></td><td>Ignore IGP Metric</td><td>VRF BGP Best Path Policy의 "Ignore IGP Metric" knob 도입 (anchor/non-anchor 간 sub-optimal forwarding 제어).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 class="sub">6.4 검증 스케일 (Verified Scalability, 6.0.1 기준)</h3>
+  <div class="meta-grid">
+    <div class="meta-card"><div class="k">L3Out당 Anchor leaf node</div><div class="v" style="font-size:24px;color:var(--accent)">6</div></div>
+    <div class="meta-card"><div class="k">L3Out당 Non-anchor leaf node</div><div class="v" style="font-size:24px;color:var(--accent-3)">32</div></div>
+  </div>
+  <div class="callout warn"><div class="ico">⚠</div><div class="body"><p>스케일 수치는 릴리스마다 갱신된다. 실제 설계 시 반드시 해당 릴리스의 <strong>Verified Scalability Guide for Cisco APIC</strong>를 확인할 것.</p></div></div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="s7">
+  <h2 class="sec"><span class="idx">07</span> 동작 방식: Control Plane / Data Plane</h2>
+  <div class="sec-rule"></div>
+
+  <h3 class="sub">7.1 Control Plane</h3>
+  <ul>
+    <li><strong>Anchor leaf node만</strong> 외부 라우터와 BGP/OSPF adjacency를 맺거나 static route의 next-hop 종단이 된다.</li>
+    <li>anchor가 외부 경로를 학습하면, 이를 <strong>MP-BGP VPNv4</strong> fabric control plane을 통해 다른 leaf로 redistribution한다.</li>
+    <li><strong>External BD(SVI subnet)</strong>는 동일 VLAN encap → 동일 VNID로 매핑되어 anchor와 non-anchor에 걸쳐 <strong>단일 L2 / broadcast 도메인</strong>을 형성한다. 그래서 외부 라우터가 non-anchor 밑에 있어도 <strong>anchor의 SVI와 L2로 연결</strong>되어 adjacency가 유지된다.</li>
+  </ul>
+
+  <h3 class="sub">7.2 Data Plane — 기본(최적화 미적용) 흐름</h3>
+  <p>외부 라우터가 <strong>non-anchor(Leaf3) 밑으로 이동</strong>한 경우(기본 동작):</p>
+  <div class="code diagram">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">traffic flow</span><button class="copy">복사</button></div>
+<pre>[Inbound]  External → Leaf3(non-anchor) → Spine → Web EP(Host4)   ← 직접 (floating IP 동일 MAC)
+
+[Outbound 기본 / Suboptimal]
+  Web EP(Host4) → Spine → Anchor(Leaf1/2) → (다시 fabric) → Leaf3 → External
+                              ▲ anchor가 외부 경로의 next-hop이므로 일단 anchor로 감</pre>
+  </div>
+  <ul>
+    <li><strong>Inbound (External→Web)</strong>: non-anchor가 floating IP(동일 MAC)를 갖고 있으므로 <strong>직접</strong> fabric으로 라우팅한다.</li>
+    <li><strong>Outbound (Web→External)</strong>: compute leaf는 외부 prefix의 next-hop을 <strong>anchor를 통해</strong> 학습했으므로, 일단 anchor로 보냈다가 다시 non-anchor로 내려가는 <strong>비대칭 / Suboptimal 경로</strong>가 발생한다.</li>
+  </ul>
+  <div class="callout note"><div class="ico">→</div><div class="body"><p>이 Suboptimal outbound 경로를 없애는 것이 <a href="#s8">8장</a>의 주제다.</p></div></div>
+
+  <h3 class="sub">7.3 이동 시 트래픽 손실</h3>
+  <div class="callout warn"><div class="ico">⏱</div><div class="body">
+    <p>VM이 클러스터 내 다른 호스트로 이동할 때 <strong>1~2초의 트래픽 손실</strong>이 예상된다.</p>
+    <p><strong>BFD TX/RX 간격은 700ms 이상</strong>을 권장(과도하게 공격적인 타이머 금지).</p></div></div>
+</section>
+<!-- ============ 8 ============ -->
+<section id="s8">
+  <h2 class="sec"><span class="idx">08</span> Suboptimal 경로 회피 (Next-Hop Propagation 등)</h2>
+  <div class="sec-rule"></div>
+  <div class="callout danger"><div class="ico">!</div><div class="body"><div class="lbl">전제 조건</div>
+    <p>이 기능들은 <strong>Physical Domain에서만 지원</strong>된다 (VMM Domain 미지원). 또한 <span class="bdg rel">6.0(2)</span> 기준 <strong>intra-VRF 트래픽만 지원</strong> — consumer/provider가 다른 VRF인 inter-VRF는 미지원(EPG↔ext-EPG, ext-EPG↔ext-EPG 모두 해당).</p></div></div>
+
+  <h3 class="sub">8.1 두 가지 기본 빌딩블록 <span class="bdg rel">5.0(1)+</span></h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:26%">기능</th><th style="width:22%">적용 위치</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Next-hop propagation</strong></td><td><span class="pill anchor">anchor만</span></td><td>외부 prefix를 fabric에 redistribute할 때 next-hop을 <strong>외부 라우터의 IP</strong>로 유지. compute leaf가 외부 라우터 IP를 next-hop으로 직접 설치.</td></tr>
+      <tr><td><strong>Direct-attached host route advertising</strong><br><small>(route-control profile)</small></td><td><span class="pill anchor">anchor</span> <span class="pill nonanchor">+ non-anchor</span></td><td>외부 라우터의 직접 연결 host route(예: <code class="inl">172.16.1.1/32</code>)를 fabric에 redistribute. compute leaf가 <strong>recursive lookup</strong>으로 외부 라우터가 실제 붙어 있는 leaf로 직접 송신.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>결과: outbound도 <code class="inl">Web EP → Spine → (외부 라우터가 붙은 leaf) → External</code>로 <strong>최적화</strong>된다.</p>
+  <div class="code diagram">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">optimized outbound</span><button class="copy">복사</button></div>
+<pre>[최적화된 Outbound]
+  Web EP(Host4) → Spine → Leaf3(외부 라우터 직접 연결) → External
+  (compute leaf가  10.0.0.0/8 via 172.16.1.1,  172.16.1.1 via Leaf3 TEP  를 recursive 해석)</pre>
+  </div>
+
+  <h3 class="sub">8.2 프로토콜별 지원 범위</h3>
+  <div class="terms">
+    <div class="term"><div class="t"><span class="bdg rel">5.0(1)~5.2(1) 이전</span></div><div class="d"><strong>eBGP</strong> peering일 때만 Suboptimal 회피 가능.</div></div>
+    <div class="term"><div class="t"><span class="bdg rel">5.2(1) 이상</span></div><div class="d"><strong>OSPF peering</strong> 및 <strong>static routing</strong>에서도 지원.</div></div>
+  </div>
+
+  <h3 class="sub">8.3 Multi-Protocol Recursive Route Resolution <span class="bdg rel">5.2(1)+</span></h3>
+  <p>BGP로 학습한 외부 prefix의 next-hop을 <strong>외부 라우터의 loopback IP</strong>로 두고, 그 loopback을 <strong>OSPF(또는 static)</strong>로 다시 학습시켜 <strong>다단계(recursive) 해석</strong>을 구성하는 방식. ECMP 확장에 핵심. (<strong>Next-hop propagation with Multipath</strong>를 추가로 활성화)</p>
+  <div class="code diagram">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">recursive resolution</span><button class="copy">복사</button></div>
+<pre>BGP        :  10.0.0.0/8  via 1.1.1.1 (loopback)            ← 단일 primary next-hop
+OSPF/static:  1.1.1.1     via 172.16.1.1, 172.16.1.2, 172.16.1.3  ← 다중 경로 (각 외부 라우터 직결 IP)
+Direct adj :  172.16.1.x  via &lt;Leaf TEP&gt;                    ← 해당 leaf의 TEP
+
+⇒ compute leaf가 동일 외부 prefix에 대해 여러 forwarder로 ECMP 가능</pre>
+  </div>
+  <div class="callout warn"><div class="ico">⚠</div><div class="body"><div class="lbl">BGP ECMP 제약 (중요)</div>
+    <p>6.0(1) 기준, floating L3Out에서 <strong>BGP로 학습한 prefix는 compute leaf에 단 하나의 next-hop만</strong> 설치된다(IPv4/IPv6 공통). 즉 BGP만으로는 동일 prefix ECMP가 불가능하며, 위의 <strong>공통 loopback + recursive 해석</strong> 우회가 필요하다. (anchor 자신은 모든 경로 설치 가능)</p></div></div>
+  <div class="callout note"><div class="ico">i</div><div class="body"><div class="lbl">프로토콜 분리 요건</div>
+    <p>BGP로 외부 route를, OSPF로 next-hop loopback을 광고하려면 <strong>L3Out을 2개</strong>(예: <code class="inl">l3out-bgp</code>, <code class="inl">l3out-ospf</code>)로 나눠야 한다. 단, 동일 floating SVI/VLAN encap을 <strong>"VRF" Encap Scope</strong>로 공유할 수 있다. 외부 route=BGP, next-hop loopback=<strong>static</strong> 조합이라면 <strong>단일 L3Out</strong>으로 가능.</p></div></div>
+
+  <h3 class="sub">8.4 Dedicated Control / Forwarding Node 분리 모델</h3>
+  <ul>
+    <li><strong>Control node</strong>(BGP로 외부 prefix 광고)와 <strong>Forwarding node</strong>(OSPF/static + 실제 데이터 포워딩)를 <strong>분리</strong>.</li>
+    <li>forwarding node를 늘려 <strong>포워딩 용량만 확장</strong>하면서, control plane peering(BGP) 수는 늘리지 않을 수 있다.</li>
+    <li>control node는 floating L3Out 또는 일반 L3Out에 연결 가능(이동하지 않는 물리 장비면 일반 L3Out 사용 가능).</li>
+  </ul>
+
+  <h3 class="sub">8.5 eBGP Multipath &amp; Addpath <span class="bdg rel">6.1(2)+</span></h3>
+  <ul>
+    <li><strong>이전</strong>: BGP peer는 control node 역할만, forwarding은 별도 노드 필요. anchor의 best-path 계산에 의존했고, <strong>directly-connected forwarder(metric 0)</strong>가 <strong>remote forwarder(metric 100)</strong>보다 우선되어, 둘이 공존하면 anchor가 directly-connected에 대해서만 multipath를 광고했다.</li>
+    <li><strong>6.1(2) 이상</strong>: eBGP peering을 forwarding node까지 직접 확장. anchor가 <strong>local metric과 무관하게 모든 unique next-hop을 fabric에 publish</strong>(addpath). directly / remote forwarder 모두 포함.</li>
+    <li><strong>Ignore IGP Metric</strong> (VRF BGP Best Path Policy): directly-connected와 fabric 경유 next-hop의 local metric을 <strong>동일화</strong>하여 모든 next-hop을 ECMP 후보로 고려(필요 시 fabric으로 hairpin 감수). <strong>floating L3Out이 배포된 anchor/non-anchor 노드에만</strong> 설정 가능.</li>
+  </ul>
+</section>
+<!-- ============ 9 ============ -->
+<section id="s9">
+  <h2 class="sec"><span class="idx">09</span> 설정 예제 (GUI / REST API / CLI)</h2>
+  <div class="sec-rule"></div>
+
+  <h3 class="sub">9.0 사전 준비 (공통)</h3>
+  <ol class="steps">
+    <li><span class="stt">Interface access policy, AEP, Layer 3 domain 구성</span></li>
+    <li><span class="stt">VMM domain 또는 Physical domain 생성</span></li>
+    <li><span class="stt">floating L3Out용 static range VLAN pool 준비</span><div style="color:var(--txt-dim);font-size:13px">VMM이면 L3Out domain과 동일 범위</div></li>
+  </ol>
+
+  <h3 class="sub">9.1 GUI — Physical Domain</h3>
+  <p><code class="inl">Tenants &gt; {tenant} &gt; Networking &gt; L3Outs &gt; 우클릭 &gt; Create L3Out</code></p>
+  <ol class="steps">
+    <li><span class="stt">Identity</span><div style="color:var(--txt-dim);font-size:13.5px">Name, VRF, <strong>L3 Domain</strong> 선택, routing protocol(<strong>BGP</strong> 또는 <strong>OSPF</strong>) 선택 → Next.</div></li>
+    <li><span class="stt">Nodes and Interfaces</span>
+      <ul>
+        <li><strong>Interface Types =</strong> <code class="inl">Floating SVI</code></li>
+        <li><strong>Domain Type =</strong> <code class="inl">Physical</code>, Domain 선택</li>
+        <li><strong>Floating Address</strong> 입력 (non-anchor 공통 IP)</li>
+        <li><strong>Encap</strong>: static range의 VLAN 입력</li>
+        <li><strong>MTU</strong>: 1500~9216 (또는 <code class="inl">inherit</code>)</li>
+        <li><strong>Node ID</strong>: anchor leaf 선택, <strong>Router ID / Loopback / IP Address Primary</strong> 입력</li>
+        <li>⚠️ 외부 라우터가 <strong>vPC anchor</strong> 뒤에 있으면 <strong>vPC peer leaf도 두 번째 anchor로 추가</strong></li>
+      </ul></li>
+    <li><span class="stt">Protocols</span><div style="color:var(--txt-dim);font-size:13.5px">OSPF policy 또는 BGP(Peer Address / eBGP Multihop TTL / Remote ASN) 구성 → Next.</div></li>
+    <li><span class="stt">External EPG</span><div style="color:var(--txt-dim);font-size:13.5px">Name, Provided/Consumed Contract, (필요 시) subnet → Finish.</div></li>
+  </ol>
+
+  <h3 class="sub">9.2 GUI — VMM Domain (VMware VDS)</h3>
+  <p><code class="inl">Logical Interface Profiles &gt; 우클릭 &gt; Create Interface Profile</code></p>
+  <ol class="steps">
+    <li><span class="stt">이름 지정 → Floating L3Out SVI 선택 → +</span></li>
+    <li><span class="stt">Anchor node 선택 + Primary IP 입력</span><div style="color:var(--txt-dim);font-size:13.5px">vPC면 각 peer leaf를 <strong>개별 anchor로</strong> 입력</div></li>
+    <li><span class="stt">Path Attributes에서 VMM domain 연결</span>
+      <ul>
+        <li>Domain Type, <strong>VMM domain</strong> 선택</li>
+        <li><strong>Enhanced LAG Policy(ELACP)</strong> 선택 — ⚠️ 호스트 vmnic이 ELACP면 여기 ELACP가 일치해야 vRouter↔leaf 포워딩 정상</li>
+        <li><strong>Encap VLAN</strong> (VMM VLAN pool의 static range 내)</li>
+        <li><strong>Floating Address</strong> 입력</li>
+      </ul></li>
+    <li><span class="stt">External EPG 구성 → Finish</span></li>
+  </ol>
+  <div class="callout note"><div class="ico">i</div><div class="body"><p>port-group이 <code class="inl">&lt;Tenant&gt; | &lt;L3Out name&gt; | &lt;VLAN Number&gt;</code> 이름으로 VDS에 자동 생성됨 → 관리자가 vRouter vNIC을 이 port-group에 연결.</p></div></div>
+
+  <h3 class="sub">9.3 REST API — VLAN Pool / VMM / L3 Domain</h3>
+  <div class="code">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">xml · vlan pool</span><button class="copy">복사</button></div>
+<pre><span class="t-cmt">&lt;!-- VLAN Pool (dynamic alloc, static range는 별도 encapblk로 지정) --&gt;</span>
+<span class="t-tag">&lt;fvnsVlanInstP</span> <span class="t-attr">name</span>=<span class="t-str">"vlanPool1"</span> <span class="t-attr">allocMode</span>=<span class="t-str">"dynamic"</span><span class="t-tag">/&gt;</span></pre>
+  </div>
+  <div class="code">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">xml · vmware vds vmm domain</span><button class="copy">복사</button></div>
+<pre><span class="t-tag">&lt;polUni&gt;</span>
+  <span class="t-tag">&lt;vmmProvP</span> <span class="t-attr">vendor</span>=<span class="t-str">"VMware"</span><span class="t-tag">&gt;</span>
+    <span class="t-tag">&lt;vmmDomP</span> <span class="t-attr">name</span>=<span class="t-str">"FTD"</span><span class="t-tag">&gt;</span>
+      <span class="t-tag">&lt;infraRsVlanNs</span> <span class="t-attr">tDn</span>=<span class="t-str">"uni/infra/vlanns-[vlanPool1]-dynamic"</span><span class="t-tag">/&gt;</span>
+      <span class="t-tag">&lt;vmmUsrAccP</span> <span class="t-attr">name</span>=<span class="t-str">"creds"</span> <span class="t-attr">usr</span>=<span class="t-str">"administrator@vsphere.local"</span> <span class="t-attr">pwd</span>=<span class="t-str">"********"</span><span class="t-tag">/&gt;</span>
+      <span class="t-tag">&lt;vmmCtrlrP</span> <span class="t-attr">name</span>=<span class="t-str">"vcenter"</span> <span class="t-attr">rootContName</span>=<span class="t-str">"Datacenter"</span> <span class="t-attr">hostOrIp</span>=<span class="t-str">"10.197.145.212"</span>
+                 <span class="t-attr">status</span>=<span class="t-str">"created,modified"</span><span class="t-tag">&gt;</span>
+        <span class="t-tag">&lt;vmmRsAcc</span> <span class="t-attr">tDn</span>=<span class="t-str">"uni/vmmp-VMware/dom-FTD/usracc-creds"</span><span class="t-tag">/&gt;</span>
+      <span class="t-tag">&lt;/vmmCtrlrP&gt;</span>
+    <span class="t-tag">&lt;/vmmDomP&gt;</span>
+  <span class="t-tag">&lt;/vmmProvP&gt;</span>
+<span class="t-tag">&lt;/polUni&gt;</span></pre>
+  </div>
+  <div class="code">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">xml · layer 3 domain</span><button class="copy">복사</button></div>
+<pre><span class="t-tag">&lt;l3extDomP</span> <span class="t-attr">name</span>=<span class="t-str">"L3Dom"</span><span class="t-tag">&gt;</span>
+  <span class="t-tag">&lt;infraRsVlanNs</span> <span class="t-attr">tDn</span>=<span class="t-str">"uni/infra/vlanns-[vlanPool1]-dynamic"</span><span class="t-tag">/&gt;</span>
+<span class="t-tag">&lt;/l3extDomP&gt;</span></pre>
+  </div>
+
+  <h3 class="sub">9.4 REST API — Floating L3Out 본체</h3>
+  <p><code class="inl">l3extVirtualLIfP</code>(floating SVI) + <code class="inl">l3extRsDynPathAtt</code>(floating IP + domain 연결)가 핵심 오브젝트다.</p>
+  <div class="code">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">xml · floating l3out</span><button class="copy">복사</button></div>
+<pre><span class="t-tag">&lt;fvTenant</span> <span class="t-attr">name</span>=<span class="t-str">"t1"</span> <span class="t-attr">status</span>=<span class="t-str">""</span><span class="t-tag">&gt;</span>
+  <span class="t-tag">&lt;fvCtx</span> <span class="t-attr">name</span>=<span class="t-str">"inb"</span><span class="t-tag">/&gt;</span>
+  <span class="t-tag">&lt;l3extOut</span> <span class="t-attr">name</span>=<span class="t-str">"l3out"</span> <span class="t-attr">status</span>=<span class="t-str">""</span><span class="t-tag">&gt;</span>
+    <span class="t-tag">&lt;l3extRsL3DomAtt</span> <span class="t-attr">tDn</span>=<span class="t-str">"uni/l3dom-L3Dom"</span><span class="t-tag">/&gt;</span>
+    <span class="t-tag">&lt;l3extInstP</span> <span class="t-attr">name</span>=<span class="t-str">"instPP"</span><span class="t-tag">&gt;</span>
+      <span class="t-tag">&lt;fvRsCons</span> <span class="t-attr">tnVzBrCPName</span>=<span class="t-str">"inb-mgmt-allow-all-contract"</span><span class="t-tag">/&gt;</span>
+    <span class="t-tag">&lt;/l3extInstP&gt;</span>
+    <span class="t-tag">&lt;l3extLNodeP</span> <span class="t-attr">name</span>=<span class="t-str">"borderLeaf"</span><span class="t-tag">&gt;</span>
+      <span class="t-cmt">&lt;!-- anchor 노드들 (router-id) --&gt;</span>
+      <span class="t-tag">&lt;l3extRsNodeL3OutAtt</span> <span class="t-attr">tDn</span>=<span class="t-str">"topology/pod-1/node-101"</span> <span class="t-attr">rtrId</span>=<span class="t-str">"10.10.10.11"</span><span class="t-tag">/&gt;</span>
+      <span class="t-tag">&lt;l3extRsNodeL3OutAtt</span> <span class="t-attr">tDn</span>=<span class="t-str">"topology/pod-1/node-102"</span> <span class="t-attr">rtrId</span>=<span class="t-str">"10.10.10.12"</span><span class="t-tag">/&gt;</span>
+      <span class="t-tag">&lt;l3extRsNodeL3OutAtt</span> <span class="t-attr">tDn</span>=<span class="t-str">"topology/pod-1/node-103"</span> <span class="t-attr">rtrId</span>=<span class="t-str">"10.10.10.13"</span><span class="t-tag">/&gt;</span>
+      <span class="t-tag">&lt;l3extLIfP</span> <span class="t-attr">name</span>=<span class="t-str">"phyDom"</span><span class="t-tag">&gt;</span>
+        <span class="t-cmt">&lt;!-- floating SVI: addr=primary IP, encap=anchor VLAN --&gt;</span>
+        <span class="t-tag">&lt;l3extVirtualLIfP</span> <span class="t-attr">encap</span>=<span class="t-str">"vlan-638"</span> <span class="t-attr">nodeDn</span>=<span class="t-str">"topology/pod-1/node-101"</span>
+                          <span class="t-attr">mode</span>=<span class="t-str">"regular"</span> <span class="t-attr">addr</span>=<span class="t-str">"11.11.11.11/24"</span> <span class="t-attr">ifInstT</span>=<span class="t-str">"ext-svi"</span><span class="t-tag">&gt;</span>
+          <span class="t-cmt">&lt;!-- floatingAddr=floating IP, tDn=physical domain --&gt;</span>
+          <span class="t-tag">&lt;l3extRsDynPathAtt</span> <span class="t-attr">tDn</span>=<span class="t-str">"uni/phys-Floating-L3out"</span> <span class="t-attr">floatingAddr</span>=<span class="t-str">"11.11.11.12/24"</span><span class="t-tag">&gt;</span>
+            <span class="t-tag">&lt;l3extIp</span> <span class="t-attr">addr</span>=<span class="t-str">"12.12.12.100/24"</span><span class="t-tag">/&gt;</span>   <span class="t-cmt">&lt;!-- floating secondary --&gt;</span>
+          <span class="t-tag">&lt;/l3extRsDynPathAtt&gt;</span>
+          <span class="t-tag">&lt;l3extIp</span> <span class="t-attr">addr</span>=<span class="t-str">"12.12.12.14/24"</span><span class="t-tag">/&gt;</span>       <span class="t-cmt">&lt;!-- secondary --&gt;</span>
+        <span class="t-tag">&lt;/l3extVirtualLIfP&gt;</span>
+      <span class="t-tag">&lt;/l3extLIfP&gt;</span>
+    <span class="t-tag">&lt;/l3extLNodeP&gt;</span>
+    <span class="t-tag">&lt;l3extRsEctx</span> <span class="t-attr">tnFvCtxName</span>=<span class="t-str">"inb"</span><span class="t-tag">/&gt;</span>
+  <span class="t-tag">&lt;/l3extOut&gt;</span>
+<span class="t-tag">&lt;/fvTenant&gt;</span></pre>
+  </div>
+
+  <h3 class="sub">9.5 REST API — Secondary / Floating Secondary IP</h3>
+  <div class="code">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">xml · secondary ip</span><button class="copy">복사</button></div>
+<pre><span class="t-tag">&lt;l3extVirtualLIfP</span> <span class="t-attr">mtu</span>=<span class="t-str">"9000"</span> <span class="t-attr">addr</span>=<span class="t-str">"20.20.20.21/24"</span> <span class="t-attr">encap</span>=<span class="t-str">"vlan-1030"</span>
+                  <span class="t-attr">nodeDn</span>=<span class="t-str">"topology/pod-1/node-101"</span> <span class="t-attr">ifInstT</span>=<span class="t-str">"ext-svi"</span><span class="t-tag">&gt;</span>
+  <span class="t-tag">&lt;l3extIp</span> <span class="t-attr">addr</span>=<span class="t-str">"11.11.11.1/24"</span><span class="t-tag">/&gt;</span>                          <span class="t-cmt">&lt;!-- secondary --&gt;</span>
+  <span class="t-tag">&lt;l3extRsDynPathAtt</span> <span class="t-attr">tDn</span>=<span class="t-str">"uni/phys-physDom1"</span> <span class="t-attr">floatingAddr</span>=<span class="t-str">"20.20.20.1/24"</span><span class="t-tag">&gt;</span>
+    <span class="t-tag">&lt;l3extIp</span> <span class="t-attr">addr</span>=<span class="t-str">"11.11.11.2/24"</span><span class="t-tag">/&gt;</span>                         <span class="t-cmt">&lt;!-- floating secondary --&gt;</span>
+  <span class="t-tag">&lt;/l3extRsDynPathAtt&gt;</span>
+<span class="t-tag">&lt;/l3extVirtualLIfP&gt;</span></pre>
+  </div>
+
+  <h3 class="sub">9.6 REST API — IPv4/IPv6 동일 VLAN encap <span class="bdg rel">5.2(4)+ VMM</span></h3>
+  <div class="code">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">xml · dual-stack same encap</span><button class="copy">복사</button></div>
+<pre><span class="t-tag">&lt;l3extOut</span> <span class="t-attr">enforceRtctrl</span>=<span class="t-str">"export"</span> <span class="t-attr">mplsEnabled</span>=<span class="t-str">"no"</span> <span class="t-attr">name</span>=<span class="t-str">"l3out1"</span><span class="t-tag">&gt;</span>
+  <span class="t-tag">&lt;l3extLNodeP</span> <span class="t-attr">name</span>=<span class="t-str">"l3out1_nodeProfile"</span><span class="t-tag">&gt;</span>
+    <span class="t-tag">&lt;l3extLIfP</span> <span class="t-attr">name</span>=<span class="t-str">"l3out1_interfaceProfile"</span><span class="t-tag">&gt;</span>
+      <span class="t-tag">&lt;l3extVirtualLIfP</span> <span class="t-attr">addr</span>=<span class="t-str">"60.60.60.1/24"</span> <span class="t-attr">encap</span>=<span class="t-str">"vlan-100"</span> <span class="t-attr">nodeDn</span>=<span class="t-str">"topology/pod-1/node-101"</span><span class="t-tag">&gt;</span>
+        <span class="t-tag">&lt;l3extRsDynPathAtt</span> <span class="t-attr">floatingAddr</span>=<span class="t-str">"60.60.60.100/24"</span> <span class="t-attr">tDn</span>=<span class="t-str">"uni/vmmp-VMware/dom-vmmDom1"</span><span class="t-tag">/&gt;</span>
+      <span class="t-tag">&lt;/l3extVirtualLIfP&gt;</span>
+    <span class="t-tag">&lt;/l3extLIfP&gt;</span>
+    <span class="t-tag">&lt;l3extLIfP</span> <span class="t-attr">name</span>=<span class="t-str">"l3out1_interfaceProfile2"</span><span class="t-tag">&gt;</span>
+      <span class="t-tag">&lt;l3extVirtualLIfP</span> <span class="t-attr">addr</span>=<span class="t-str">"2021::1/64"</span> <span class="t-attr">encap</span>=<span class="t-str">"vlan-100"</span> <span class="t-attr">nodeDn</span>=<span class="t-str">"topology/pod-1/node-101"</span><span class="t-tag">&gt;</span>
+        <span class="t-tag">&lt;l3extRsDynPathAtt</span> <span class="t-attr">floatingAddr</span>=<span class="t-str">"2021::100/64"</span> <span class="t-attr">tDn</span>=<span class="t-str">"uni/vmmp-VMware/dom-vmmDom1"</span><span class="t-tag">/&gt;</span>
+      <span class="t-tag">&lt;/l3extVirtualLIfP&gt;</span>
+    <span class="t-tag">&lt;/l3extLIfP&gt;</span>
+  <span class="t-tag">&lt;/l3extLNodeP&gt;</span>
+<span class="t-tag">&lt;/l3extOut&gt;</span></pre>
+  </div>
+
+  <h3 class="sub">9.7 REST API — Suboptimal 회피 / BGP Max Path / 다중 Next-Hop</h3>
+  <div class="code">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">xml · optimization knobs</span><button class="copy">복사</button></div>
+<pre><span class="t-cmt">&lt;!-- (1) Next-hop propagation (next-hop unchanged) --&gt;</span>
+<span class="t-tag">&lt;rtctrlSetNhUnchanged</span> <span class="t-attr">name</span>=<span class="t-str">""</span> <span class="t-attr">type</span>=<span class="t-str">"nh-unchanged"</span> <span class="t-attr">status</span>=<span class="t-str">"created"</span><span class="t-tag">/&gt;</span>
+
+<span class="t-cmt">&lt;!-- (2) Direct-attached host route advertising (route map 연결) --&gt;</span>
+<span class="t-tag">&lt;l3extRsRedistributePol</span> <span class="t-attr">src</span>=<span class="t-str">"am"</span> <span class="t-attr">rType</span>=<span class="t-str">"mo"</span> <span class="t-attr">tCl</span>=<span class="t-str">"rtctrlProfile"</span>
+    <span class="t-attr">tnRtctrlProfileName</span>=<span class="t-str">"sap-rtmap"</span> <span class="t-attr">status</span>=<span class="t-str">"created"</span>
+    <span class="t-attr">dn</span>=<span class="t-str">"uni/tn-neo/out-neoL3Out/rsredistributePol-[sap-rtmap]-am"</span><span class="t-tag">/&gt;</span>
+
+<span class="t-cmt">&lt;!-- (3) Fabric redistribution Max ECMP (VRF 레벨) --&gt;</span>
+<span class="t-tag">&lt;fvTenant</span> <span class="t-attr">dn</span>=<span class="t-str">"uni/tn-t1"</span> <span class="t-attr">name</span>=<span class="t-str">"t1"</span><span class="t-tag">&gt;</span>
+  <span class="t-tag">&lt;fvCtx</span> <span class="t-attr">name</span>=<span class="t-str">"v1"</span><span class="t-tag">&gt;</span>
+    <span class="t-tag">&lt;fvRsCtxToBgpCtxAfPol</span> <span class="t-attr">af</span>=<span class="t-str">"ipv4-ucast"</span> <span class="t-attr">tnBgpCtxAfPolName</span>=<span class="t-str">"bgpCtxPol1"</span><span class="t-tag">/&gt;</span>
+  <span class="t-tag">&lt;/fvCtx&gt;</span>
+  <span class="t-tag">&lt;bgpCtxAfPol</span> <span class="t-attr">name</span>=<span class="t-str">"bgpCtxPol1"</span> <span class="t-attr">maxLocalEcmp</span>=<span class="t-str">"16"</span><span class="t-tag">/&gt;</span>   <span class="t-cmt">&lt;!-- maxEcmp/maxEcmpIbgp도 사용 --&gt;</span>
+<span class="t-tag">&lt;/fvTenant&gt;</span>
+
+<span class="t-cmt">&lt;!-- (4) 다중 Next-Hop redistribution --&gt;</span>
+<span class="t-tag">&lt;fvTenant</span> <span class="t-attr">dn</span>=<span class="t-str">"uni/tn-t1"</span><span class="t-tag">&gt;</span>
+  <span class="t-tag">&lt;rtctrlAttrP</span> <span class="t-attr">name</span>=<span class="t-str">"s1"</span><span class="t-tag">&gt;</span>
+    <span class="t-tag">&lt;rtctrlSetRedistMultipath</span><span class="t-tag">/&gt;</span>
+  <span class="t-tag">&lt;/rtctrlAttrP&gt;</span>
+<span class="t-tag">&lt;/fvTenant&gt;</span></pre>
+  </div>
+
+  <h3 class="sub">9.8 CLI — Multiple Encapsulation 연결 (참고)</h3>
+  <div class="code">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">apic cli</span><button class="copy">복사</button></div>
+<pre><span class="t-prompt">apic1(config)#</span> leaf &lt;leaf-ID&gt;
+<span class="t-prompt">apic1(config-leaf)#</span> virtual-interface-profile &lt;ipv4/ipv6&gt; vlan &lt;vlan-num&gt; \
+                      tenant &lt;tenant&gt; vrf &lt;VRF&gt; l3out &lt;L3Out&gt;
+<span class="t-prompt">apic1(virtual-interface-profile)#</span> ip address &lt;IP-address&gt;
+<span class="t-prompt">apic1(virtual-interface-profile)#</span> physical-domain &lt;phy-dom-name&gt; floating-addr &lt;IP-address&gt;
+<span class="t-prompt">apic1(physical-domain)#</span> vlan &lt;vlan-num&gt;
+<span class="t-prompt">apic1(physical-domain)#</span> exit
+<span class="t-prompt">apic1(config-tenant)#</span> external-bridge-profile &lt;bridge-profile-name&gt;</pre>
+  </div>
+
+  <h3 class="sub">9.9 BGP / OSPF 분리 구성 핵심 (요약)</h3>
+  <div class="callout note"><div class="ico">i</div><div class="body"><p>동일 floating SVI/VLAN을 공유하려면 양쪽 SVI의 <strong>Encap Scope = <code class="inl">VRF</code></strong>로 설정.</p></div></div>
+  <ul>
+    <li><code class="inl">l3out-bgp</code>: anchor↔외부 라우터 loopback 간 <strong>eBGP</strong>. import route-control로 외부 loopback이 import되지 않도록, export route-control로 loopback이 export되지 않도록 제어.</li>
+    <li><code class="inl">l3out-ospf</code>: loopback 도달성 교환 + 외부 route redistribution. <code class="inl">default-export</code> route map에 필요한 route + <code class="inl">l3out-bgp</code>의 loopback 포함.</li>
+    <li>External EPG의 classification subnet(예: <code class="inl">10.0.0.0/8</code>)은 <strong>둘 중 한 L3Out에만</strong> 구성.</li>
+  </ul>
+</section>
+<!-- ============ 10 ============ -->
+<section id="s10">
+  <h2 class="sec"><span class="idx">10</span> Multiple Encapsulation 지원</h2>
+  <div class="sec-rule"></div>
+
+  <h3 class="sub">10.1 배경 <span class="bdg rel">5.2(3)+</span></h3>
+  <p>기본적으로 동일 encap VLAN을 여러 leaf에 쓰면 동일 VNID로 매핑되어 <strong>하나의 External BD</strong>가 된다. 다른 VLAN을 쓰면 <strong>별도 External BD</strong>가 되었다(5.2(3) 이전엔 leaf마다 다른 VLAN으로 단일 BD 구성 불가).</p>
+  <p><span class="bdg rel">5.2(3)</span>부터 leaf마다 <strong>다른 VLAN encap을 쓰면서도 단일 External BD</strong>를 구성할 수 있다. (동일 VLAN을 다른 leaf에서 이미 쓰고 있어 재사용 불가한 경우 유용)</p>
+  <ul>
+    <li>Floating SVI → <strong>physical domain의 Path Attribute(<code class="inl">l3extRsDynPathAtt</code>)</strong>로 leaf 세트별 VLAN 매핑.</li>
+    <li>Regular SVI → <strong>External Bridge Group Profile(<code class="inl">l3extBdProfile</code>)</strong>로 서로 다른 VLAN의 SVI들을 하나의 BD로 그룹화.</li>
+    <li><strong>6.0(1) 기준 Physical Domain L3Out만 지원</strong> (VMM 미지원).</li>
+  </ul>
+
+  <h3 class="sub">10.2 구성 패턴 예시 (Floating SVI)</h3>
+  <div class="code diagram">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">multi-encap mapping</span><button class="copy">복사</button></div>
+<pre>anchor  : node101, node102 → physDom1 / vlan100  (vPC pair → 동일 VLAN)
+floating: node103, node104 → physDom2 / vlan101
+floating: node105, node106 → physDom3 / vlan102</pre>
+  </div>
+  <ul>
+    <li>VLAN은 <strong>physical domain 단위로 프로비저닝</strong>되므로, encap이 다르면 <strong>domain/AEP를 분리</strong>해야 한다.</li>
+    <li>anchor의 Path Attribute는 <strong>Access Encap을 비워둠</strong>(anchor는 floating SVI의 encap=vlan100 사용). 다른 leaf용 domain은 해당 VLAN을 Access Encap에 지정.</li>
+  </ul>
+
+  <h3 class="sub">10.3 Multiple Encapsulation 제약</h3>
+  <ul>
+    <li><strong>Physical domain L3Out 전용</strong>(VMM 미지원).</li>
+    <li>외부 장비/하이퍼바이저가 <strong>L2 loop를 차단</strong>한다는 전제. STP 의존 외부 스위치와 함께 쓰면 loop 위험.</li>
+    <li>External Bridge Group Profile 적용/변경 시 <strong>VLAN 재프로그래밍 → 트래픽 disruption</strong> 발생.</li>
+    <li>각 access encap마다 <strong>별도 physical domain + AEP</strong> 생성, 그 노드들은 <strong>상호 비중첩(non-overlapping)</strong>.</li>
+    <li>동일 external bridge group 내에서 <strong>다른 VLAN encap을 가진 SVI는 같은 leaf에 프로그래밍 불가</strong>.</li>
+    <li>anchor 및 그 vPC pair는 <strong>단일 physical domain/AEP</strong>에 속해야 함.</li>
+    <li><strong>SVI Encap Scope = <code class="inl">Local</code></strong> 필수. <strong>VRF Encap scope 미지원</strong>.</li>
+    <li>동일 floating SVI/bridge profile group에 <strong>동일 physical domain을 다른 VLAN으로 중복 구성 금지</strong>.</li>
+  </ul>
+</section>
+
+<!-- ============ 11 ============ -->
+<section id="s11">
+  <h2 class="sec"><span class="idx">11</span> 제약사항 및 고려사항 (Restrictions)</h2>
+  <div class="sec-rule"></div>
+  <p style="color:var(--txt-faint);font-size:13px">Cisco "Summary of Floating L3Out Deployment Considerations and Restrictions" 기준 정리.</p>
+
+  <h3 class="sub">11.1 도메인 / 기능 전제</h3>
+  <ul>
+    <li><strong>Physical domain</strong>: 5.0(1) 이상 필요.</li>
+    <li><strong>Next-hop propagation(Suboptimal 회피)</strong>: <strong>Physical domain 전용</strong>, <strong>intra-VRF 전용</strong>. inter-VRF(consumer/provider 다른 VRF) 미지원.</li>
+    <li><strong>Multicast routing (PIM, PIM6)</strong>: floating SVI에서 <strong>미지원</strong>.</li>
+  </ul>
+
+  <h3 class="sub">11.2 VMM Domain 관련</h3>
+  <ul>
+    <li>vRouter는 VMM domain이 생성한 <strong>port-group에 연결</strong>되어야 함.</li>
+    <li>해당 port-group에 연결된 vRouter가 <strong>하나도 없으면</strong> 그 leaf에 floating SVI가 프로그래밍되지 않음.</li>
+    <li><strong>DHCP client가 floating SVI로 연결</strong>될 경우, <strong>DHCP server는 floating SVI physical domain에 속한 동일 leaf(anchor/non-anchor)에 연결 금지</strong>.</li>
+    <li><strong>Secondary floating IP</strong>는 5.0(1)부터 지원. 이전 릴리스로 downgrade 전 secondary 설정 제거 필요.</li>
+  </ul>
+
+  <h3 class="sub">11.3 토폴로지 / 스위치 제약</h3>
+  <div class="callout danger"><div class="ico">!</div><div class="body"><div class="lbl">설계 초기 확정 필요</div>
+    <p><strong>Multi-Pod</strong>: pod에 걸친 배포는 지원되나, <strong>anchor와 non-anchor가 서로 다른 pod에 있으면 Suboptimal 회피(next-hop propagation/multipath) 미지원</strong>. (동일 pod면 internal EP는 어느 pod든 무방)<br>
+    <strong>Remote Leaf</strong>: <strong>미지원</strong>(remote leaf direct 활성화해도). remote leaf는 anchor/non-anchor로 배포 불가.</p></div></div>
+  <ul>
+    <li><strong>Generation 1 leaf</strong>: anchor/non-anchor 불가(compute leaf로만 사용 가능).</li>
+    <li><strong>Per-port VLAN</strong>: floating L3Out 포트에서 미지원.</li>
+    <li><strong>Non-anchor 노드</strong>는 <strong>logical node profile 아래에 구성 금지</strong>.</li>
+  </ul>
+
+  <h3 class="sub">11.4 vPC / IP / Static Route</h3>
+  <ul>
+    <li>vPC interface로 외부 라우터를 연결하고 한쪽이 anchor면, <strong>vPC pair의 다른 쪽도 반드시 anchor</strong>여야 함. 동일 VLAN encap에서 anchor/non-anchor 혼합 불가.</li>
+    <li><strong>Static route</strong>: 외부 라우터는 anchor의 <strong>primary 또는 secondary IP</strong>를 next-hop으로 사용해야 함.</li>
+    <li><strong>Primary IP와 floating primary IP는 동일 subnet</strong>.</li>
+    <li>floating SVI와 non-floating SVI가 <strong>동일 VLAN encap</strong>으로 같은 leaf에 공존하려면 <strong>동일 primary IP</strong>를 사용해야 함.</li>
+  </ul>
+
+  <h3 class="sub">11.5 IPv4 / IPv6 규칙</h3>
+  <ul>
+    <li>동일 L3Out · 동일 leaf에서 IPv4/IPv6는 <strong>서로 다른 logical interface profile</strong> 필요.</li>
+    <li><strong>Physical domain</strong>: 동일 VLAN encap이면 IPv4/IPv6 모두 <strong>동일 anchor</strong> 사용 필수(서로 다른 leaf 세트 불가).</li>
+    <li><strong>VMM domain</strong>: 5.2(4) 이전엔 IPv4/IPv6 <strong>다른 VLAN encap</strong> 필요(port-group 분리). 5.2(4) 이상은 <strong>동일 encap 가능</strong>(단일 port-group). downgrade 시 동일 encap·다른 AF 동적 attachment 삭제됨.</li>
+    <li>recursive next-hop propagation 시 <strong>IPv6 link-local 미지원</strong> → global address 사용.</li>
+  </ul>
+
+  <h3 class="sub">11.6 Routing / Redistribution 동작</h3>
+  <ul>
+    <li><strong>Attached host route</strong>(외부 라우터 IP)의 fabric 외부 광고: 5.2(1) 이전은 export rule 명시 시 광고 가능, <strong>5.2(1) 이상은 기본적으로 외부 광고가 암묵적으로 deny</strong>됨.</li>
+    <li><strong>BGP 학습 prefix는 compute leaf에 단일 next-hop만 설치</strong>(6.0(1), IPv4/IPv6). ECMP는 공통 loopback + recursive로 우회.</li>
+    <li><strong>OSPF NSSA</strong>: forwarding node용 OSPF-only L3Out은 <strong>OSPF Area Type = NSSA</strong> 사용(next-hop을 global address로 학습하기 위해 type-7 LSA 필요).</li>
+    <li>static route에 다중 next-hop 사용 시 하나가 down되면 경로가 비최적일 수 있음 → <strong>CSCvy10946</strong> 참조.</li>
+    <li>CLI로 recursive next-hop propagation 구성 시: BGP peer에 <strong>next-hop unchanged route-map 미지원</strong>, route-profile template은 <strong>match rule 미지원</strong>.</li>
+  </ul>
+
+  <h3 class="sub">11.7 알려진 결함(Bug) 및 주의</h3>
+  <div class="callout danger"><div class="ico">🐞</div><div class="body"><div class="lbl">CSCwd28918</div>
+    <p>next-hop propagation 활성화 시, <strong>여러 외부 라우터(control node redundancy)가 동일 외부 prefix를 동일 ECMP path로 광고하는 구성 비권장</strong>.</p>
+    <p style="margin-top:6px"><span class="yes">✅ 권장</span> 서로 다른 next-hop IP — router1: <code class="inl">10.1.0.0/16 via 172.16.1.1</code>, router2: <code class="inl">... via 172.16.1.2</code><br>
+    <span class="no">❌ 비권장</span> 동일 next-hop IP (둘 다 <code class="inl">... via 1.1.1.1</code>) → ECMP 아님.</p></div></div>
+  <ul>
+    <li><strong>ECMP 트래픽 불균형</strong>: next-hop propagation으로 ECMP peer가 anchor/non-anchor에 걸쳐 연결될 때 분포가 불균등할 수 있음(anchor 뒤 장비가 트래픽을 적게 수신, Leaf 간 hairpin 발생 가능).</li>
+    <li><strong>L3 next-hop 고사용 + IPv6 EP 다수</strong>가 동일 border leaf에 있으면 트래픽 drop 가능.</li>
+    <li><strong>수동 ARP clear 주의</strong>: non-anchor에서 외부 IP의 ARP를 수동으로 지우면 그 leaf가 외부 IP 광고를 멈춰 경로가 비최적이 됨. <strong>모든 anchor/non-anchor에서 함께 clear</strong>해야 재최적화됨(IPv6 인접성도 동일).</li>
+    <li><strong>UCS B-Series(FI 뒤 ESXi)</strong>: <strong>Fabric Failover는 비활성화</strong> 권장. 활성화 시 LLDP/CDP가 active/standby vEth 양쪽에 보여 <strong>flapping/deploy 이슈</strong> 유발 → DVS 자체 redundancy 사용.</li>
+  </ul>
+
+  <h3 class="sub">11.8 BFD / 수렴</h3>
+  <div class="callout warn"><div class="ico">⏱</div><div class="body"><p>VM 이동 시 <strong>1~2초 트래픽 손실</strong> 예상. <strong>BFD TX/RX ≥ 700ms</strong> 권장.</p></div></div>
+
+  <h3 class="sub">11.9 Nexus Dashboard Orchestrator(NDO) 연동</h3>
+  <ul>
+    <li><strong>NDO 4.1(1) 이전</strong>: floating SVI 구성은 <strong>APIC 레벨</strong>(NDO에서 직접 구성 불가). 단, NDO가 floating SVI 포함 L3Out을 <strong>참조</strong>는 가능.</li>
+    <li><strong>NDO 4.1(1) 이상</strong>: floating L3Out 포함 전체 L3Out 구성을 NDO에서 수행 가능. 단, next-hop propagation 등 floating L3Out <strong>기능 자체는 각 fabric 내에서</strong> 동작.</li>
+  </ul>
+</section>
+<!-- ============ 12 ============ -->
+<section id="s12">
+  <h2 class="sec"><span class="idx">12</span> 설계 Best Practice 및 체크리스트</h2>
+  <div class="sec-rule"></div>
+
+  <h3 class="sub">12.1 도메인 선택 의사결정</h3>
+  <div class="code diagram">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="lang">decision tree</span><button class="copy">복사</button></div>
+<pre>외부 장비가 ACI VMM(VMware VDS)으로 관리되는 가상 장비인가?
+        │
+   ┌────┴─────────────────────────────┐
+  YES                                  NO (물리 라우터 / VMM 비통합 가상장비)
+   │                                   │
+ Suboptimal 회피·Multi-Encap 필요?     → Physical Domain 사용
+   │                                     (Next-hop propagation, Multi-Encap 등 전부 가능)
+ ┌─┴───────────┐
+YES             NO
+ │              │
+Physical로     VMM Domain 사용
+구성 검토        (port-group 자동화 / 동적 deploy 이점)
+(VMM은 해당
+ 기능 미지원)</pre>
+  </div>
+
+  <h3 class="sub">12.2 핵심 설계 권고</h3>
+  <ol class="steps">
+    <li><span class="stt">Anchor는 vPC pair 단위로</span><div style="color:var(--txt-dim);font-size:13.5px">외부 라우터가 vPC로 붙으면 vPC peer <strong>둘 다 anchor</strong>. 안정적 adjacency와 redundancy 확보.</div></li>
+    <li><span class="stt">Anchor 수는 redundancy + scale 균형</span><div style="color:var(--txt-dim);font-size:13.5px">L3Out당 anchor 6 / non-anchor 32(6.0.1 검증치)를 넘지 않도록, release별 Verified Scalability Guide 확인.</div></li>
+    <li><span class="stt">BFD 700ms 이상</span><div style="color:var(--txt-dim);font-size:13.5px">false positive 방지하되 1~2초 이동 손실은 설계 SLA에 반영.</div></li>
+    <li><span class="stt">ECMP가 필요하면 BGP 단독을 피하라</span><div style="color:var(--txt-dim);font-size:13.5px">공통 loopback + OSPF/static recursive(5.2.1+) 또는 eBGP multipath/addpath(6.1.2+) 채택. BGP 단독은 compute leaf에서 single next-hop.</div></li>
+    <li><span class="stt">Control / Forwarding node 분리</span><div style="color:var(--txt-dim);font-size:13.5px">포워딩 확장과 control plane peering 수를 디커플링.</div></li>
+    <li><span class="stt">BGP+OSPF 동시 필요 시 L3Out 2개</span><div style="color:var(--txt-dim);font-size:13.5px"><code class="inl">l3out-bgp</code> / <code class="inl">l3out-ospf</code> + 동일 floating SVI는 Encap Scope=VRF로 공유.</div></li>
+    <li><span class="stt">Multi-Encap 사용 시 Encap Scope=Local</span><div style="color:var(--txt-dim);font-size:13.5px">domain/AEP를 encap별로 분리하고 노드 비중첩 유지.</div></li>
+    <li><span class="stt">CSCwd28918 회피</span><div style="color:var(--txt-dim);font-size:13.5px">redundant control node는 <strong>서로 다른 next-hop IP</strong>로 광고.</div></li>
+    <li><span class="stt">Multi-Pod에서 anchor/non-anchor를 같은 pod로</span><div style="color:var(--txt-dim);font-size:13.5px">Suboptimal 회피 기능 유지.</div></li>
+    <li><span class="stt">Remote Leaf에는 floating L3Out 배치 불가</span><div style="color:var(--txt-dim);font-size:13.5px">설계 초기에 위치 확정.</div></li>
+    <li><span class="stt">운영 중 ARP 수동 clear는 모든 anchor/non-anchor 동시에</span></li>
+  </ol>
+
+  <h3 class="sub">12.3 사전 점검 체크리스트 <small style="color:var(--txt-faint);font-weight:400">(클릭하여 체크)</small></h3>
+  <ul class="check">
+    <li><span class="box">✓</span><span class="tx">모든 anchor/non-anchor가 <strong>Gen2 leaf</strong>인가?</span></li>
+    <li><span class="box">✓</span><span class="tx">floating L3Out용 <strong>static range VLAN pool</strong> 준비(VMM이면 L3Out domain과 동일 범위)?</span></li>
+    <li><span class="box">✓</span><span class="tx"><strong>Primary IP ↔ Floating Primary IP 동일 subnet</strong>?</span></li>
+    <li><span class="box">✓</span><span class="tx">vPC anchor의 <strong>peer leaf도 anchor로 등록</strong>?</span></li>
+    <li><span class="box">✓</span><span class="tx">static routing이면 외부 장비 next-hop = anchor <strong>primary/secondary IP</strong>?</span></li>
+    <li><span class="box">✓</span><span class="tx">Suboptimal 회피/Multi-Encap 필요 → <strong>Physical domain</strong>으로 구성?</span></li>
+    <li><span class="box">✓</span><span class="tx">inter-VRF 트래픽에 next-hop propagation을 기대하고 있지 않은가? (미지원)</span></li>
+    <li><span class="box">✓</span><span class="tx">BFD 타이머 ≥ 700ms?</span></li>
+    <li><span class="box">✓</span><span class="tx">Multi-Pod 배치 시 anchor/non-anchor 동일 pod?</span></li>
+    <li><span class="box">✓</span><span class="tx">NDO 사용 시 버전(4.1(1)±)에 따른 구성 위치 확인?</span></li>
+    <li><span class="box">✓</span><span class="tx">해당 릴리스 <strong>Verified Scalability Guide</strong>로 anchor/non-anchor/ECMP 스케일 재확인?</span></li>
+  </ul>
+</section>
+
+<!-- ============ 13 ============ -->
+<section id="s13">
+  <h2 class="sec"><span class="idx">13</span> 참고 문서</h2>
+  <div class="sec-rule"></div>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:32%">문서</th><th style="width:30%">용도</th><th>링크</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Simplify Outside Network Connections Using Floating L3Outs</strong><br><small>Cisco APIC Configuration Guide</small></td><td>본 가이드의 1차 출처(개요·구성·제약·REST/CLI 전체)</td><td><a href="https://www.cisco.com/c/en/us/td/docs/dcn/aci/apic/all/floating-l3outs/simplify-outside-network-connections-using-floating-l3outs/m-overview.html" target="_blank" rel="noopener">cisco.com ↗</a></td></tr>
+      <tr><td><strong>Cisco ACI Design Guide</strong><br><small>White Paper</small></td><td>Floating SVI 설계 컨텍스트, BL/엔드포인트 학습</td><td><a href="https://www.cisco.com/c/en/us/td/docs/dcn/whitepapers/cisco-application-centric-infrastructure-design-guide.html" target="_blank" rel="noopener">cisco.com ↗</a></td></tr>
+      <tr><td><strong>Cisco ACI Fabric L3Out White Paper</strong><br><small>guide-c07-743150</small></td><td>L3Out 일반 / Encap Scope(VRF) 등</td><td><a href="https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/guide-c07-743150.html" target="_blank" rel="noopener">cisco.com ↗</a></td></tr>
+      <tr><td><strong>Cisco APIC Layer 3 Networking Configuration Guide</strong></td><td>BGP/OSPF/ASN 등 라우팅 프로토콜 상세</td><td><a href="https://www.cisco.com/c/en/us/td/docs/dcn/aci/apic/6x/l3-configuration/cisco-apic-layer-3-networking-configuration-guide-60x/routing-protocol-support-layer3-config-60x.html" target="_blank" rel="noopener">cisco.com ↗</a></td></tr>
+      <tr><td><strong>Verified Scalability Guide for Cisco APIC</strong></td><td>릴리스별 anchor/non-anchor/ECMP 스케일</td><td>Cisco APIC documentation page</td></tr>
+      <tr><td>Bug <strong>CSCwd28918</strong></td><td>redundant control node + next-hop propagation ECMP 이슈</td><td><a href="https://bst.cloudapps.cisco.com/bugsearch/bug/CSCwd28918" target="_blank" rel="noopener">bugsearch ↗</a></td></tr>
+      <tr><td>Bug <strong>CSCvy10946</strong></td><td>static route 다중 next-hop down 시 비최적 경로</td><td><a href="https://bst.cloudapps.cisco.com/bugsearch/bug/CSCvy10946" target="_blank" rel="noopener">bugsearch ↗</a></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 class="sub">주요 ACI 오브젝트 빠른 참조</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:38%">Managed Object (MO)</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td><code class="inl">l3extOut</code></td><td>L3Out</td></tr>
+      <tr><td><code class="inl">l3extLNodeP</code></td><td>Logical Node Profile (anchor 노드 등록: <code class="inl">l3extRsNodeL3OutAtt</code>)</td></tr>
+      <tr><td><code class="inl">l3extLIfP</code></td><td>Logical Interface Profile</td></tr>
+      <tr><td><code class="inl">l3extVirtualLIfP</code></td><td><strong>Floating SVI</strong> (addr=primary IP, encap, <code class="inl">ifInstT="ext-svi"</code>)</td></tr>
+      <tr><td><code class="inl">l3extRsDynPathAtt</code></td><td>floating IP(<code class="inl">floatingAddr</code>) + domain(<code class="inl">tDn</code>) 연결 (path attribute)</td></tr>
+      <tr><td><code class="inl">l3extIp</code></td><td>secondary / floating secondary IP</td></tr>
+      <tr><td><code class="inl">l3extBdProfile</code></td><td>External Bridge Group Profile (Multi-Encap regular SVI 그룹화)</td></tr>
+      <tr><td><code class="inl">l3extBdProfileCont</code> / <code class="inl">l3extRsBdProfile</code></td><td>SVI ↔ external bridge profile 연결</td></tr>
+      <tr><td><code class="inl">rtctrlSetNhUnchanged</code></td><td>next-hop propagation (next-hop unchanged)</td></tr>
+      <tr><td><code class="inl">rtctrlSetRedistMultipath</code></td><td>다중 next-hop redistribution</td></tr>
+      <tr><td><code class="inl">bgpCtxAfPol</code> <small>(<code class="inl">maxEcmp</code>/<code class="inl">maxEcmpIbgp</code>/<code class="inl">maxLocalEcmp</code>)</small></td><td>fabric redistribution Max Path (VRF)</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+  </div><!--/content-->
+
+  <footer>
+    <div class="disc">본 문서는 Cisco 공식 문서를 기반으로 작성되었으며, 버전별 동작·스케일·제약은 배포 대상 릴리스의 최신 Cisco 공식 문서로 반드시 교차 확인하십시오.</div>
+    <div>Cisco ACI Floating L3Out 기술 가이드 · 네트워크 기술 아키텍트용 · 기준 릴리스 APIC 4.2(1)–6.1(2)</div>
+  </footer>
+</main>
+</div>
+
+<div id="toTop" title="맨 위로">↑</div>
+
+<script>
+/* progress + scrollspy */
+const links=[...document.querySelectorAll('nav.toc a')];
+const secIds=links.map(a=>a.getAttribute('href').slice(1));
+const prog=document.getElementById('progress');
+const toTop=document.getElementById('toTop');
+function onScroll(){
+  const h=document.documentElement;
+  const sc=h.scrollTop, max=h.scrollHeight-h.clientHeight;
+  prog.style.width=(max>0?(sc/max*100):0)+'%';
+  toTop.classList.toggle('show',sc>500);
+  let cur=secIds[0];
+  for(const id of secIds){const el=document.getElementById(id); if(el && el.getBoundingClientRect().top<=120) cur=id;}
+  links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+cur));
+}
+document.addEventListener('scroll',onScroll,{passive:true});
+window.addEventListener('load',onScroll);
+toTop.onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
+
+/* copy buttons */
+function bindCopy(){
+  document.querySelectorAll('.code .copy').forEach(b=>{
+    if(b.dataset.bound)return; b.dataset.bound=1;
+    b.onclick=()=>{
+      const pre=b.closest('.code').querySelector('pre');
+      navigator.clipboard.writeText(pre.innerText).then(()=>{
+        const t=b.textContent; b.textContent='✓ 복사됨'; b.classList.add('done');
+        setTimeout(()=>{b.textContent=t;b.classList.remove('done')},1400);
+      });
+    };
+  });
+}
+
+/* theme toggle */
+const themeBtn=document.getElementById('themeBtn'), themeLbl=document.getElementById('themeLbl');
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);
+  themeBtn.firstChild.textContent=(t==='light'?'☀️ ':'🌙 ');themeLbl.textContent=(t==='light'?'Light':'Dark');
+  try{localStorage.setItem('aci-theme',t)}catch(e){}}
+themeBtn.onclick=()=>setTheme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light');
+try{setTheme(localStorage.getItem('aci-theme')||'dark')}catch(e){setTheme('dark')}
+
+/* mobile menu */
+const sb=document.getElementById('sidebar'),scrim=document.getElementById('scrim'),menuBtn=document.getElementById('menuBtn');
+function closeM(){sb.classList.remove('open');scrim.classList.remove('show')}
+menuBtn.onclick=()=>{sb.classList.toggle('open');scrim.classList.toggle('show')};
+scrim.onclick=closeM;
+document.querySelectorAll('nav.toc a').forEach(a=>a.addEventListener('click',closeM));
+
+/* checklist toggle */
+function bindChecks(){document.querySelectorAll('.check li').forEach(li=>{
+  if(li.dataset.b)return; li.dataset.b=1;
+  li.onclick=()=>li.classList.toggle('done');
+});}
+
+/* search filter */
+const si=document.getElementById('searchInput');
+if(si){si.addEventListener('input',()=>{
+  const q=si.value.trim().toLowerCase();
+  document.querySelectorAll('main section').forEach(sec=>{
+    if(!q){sec.style.display='';return;}
+    sec.style.display=sec.innerText.toLowerCase().includes(q)?'':'none';
+  });
+});}
+
+window.addEventListener('DOMContentLoaded',()=>{bindCopy();bindChecks();});
+</script>
+</body>
+</html>

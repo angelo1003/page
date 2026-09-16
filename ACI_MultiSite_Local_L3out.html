@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACI Multi-Site — Per-Site L3Out Locality 구성 가이드</title>
+<style>
+  :root{
+    --bg:#0a0e17; --bg2:#0f1626; --panel:#121b2e; --panel2:#16213a;
+    --line:#1e2c45; --line2:#27395a;
+    --txt:#e7ecf5; --muted:#9fb0cc; --dim:#6b7d9c;
+    --cyan:#22d3ee; --cyan-d:#0891b2; --blue:#3b82f6; --indigo:#6366f1;
+    --green:#34d399; --green-d:#059669; --amber:#fbbf24; --amber-d:#d97706;
+    --red:#f87171; --red-d:#dc2626; --pink:#ec4899; --violet:#a78bfa;
+    --site1:#22d3ee; --site2:#a78bfa;
+    --radius:16px; --radius-s:10px;
+    --shadow:0 10px 40px -10px rgba(0,0,0,.6);
+    --mono:'SF Mono',SFMono-Regular,ui-monospace,'JetBrains Mono','Fira Code',Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','Pretendard','Apple SD Gothic Neo',Roboto,'Helvetica Neue',Arial,'Malgun Gothic',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;font-family:var(--sans);color:var(--txt);line-height:1.7;
+    background:
+      radial-gradient(1200px 600px at 80% -10%,rgba(99,102,241,.14),transparent 60%),
+      radial-gradient(1000px 500px at 0% 10%,rgba(34,211,238,.10),transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:rgba(34,211,238,.3)}
+
+  /* ---- Layout ---- */
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+  .grid{display:grid;gap:22px}
+
+  /* ---- Progress bar ---- */
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:200;
+    background:linear-gradient(90deg,var(--cyan),var(--indigo),var(--violet));
+    box-shadow:0 0 12px rgba(34,211,238,.6)}
+
+  /* ---- Hero ---- */
+  header.hero{position:relative;padding:64px 0 40px;overflow:hidden}
+  .hero-bg{position:absolute;inset:0;z-index:0;opacity:.5;
+    background-image:
+      linear-gradient(rgba(34,211,238,.05) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(34,211,238,.05) 1px,transparent 1px);
+    background-size:34px 34px;mask:radial-gradient(700px 360px at 70% 0%,#000,transparent 75%)}
+  .hero-inner{position:relative;z-index:1}
+  .eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);
+    font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--cyan);
+    background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.25);
+    padding:7px 14px;border-radius:999px;margin-bottom:22px}
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--cyan);
+    box-shadow:0 0 10px var(--cyan);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  h1.title{margin:0 0 14px;font-size:clamp(30px,4.6vw,50px);line-height:1.12;font-weight:800;letter-spacing:-.02em}
+  h1.title .grad{background:linear-gradient(100deg,var(--cyan),var(--violet) 70%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .subtitle{font-size:clamp(16px,2vw,19px);color:var(--muted);max-width:760px;margin:0}
+  .hero-tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+  .tag{font-family:var(--mono);font-size:12.5px;color:var(--muted);
+    background:var(--panel);border:1px solid var(--line2);padding:6px 12px;border-radius:8px}
+  .tag b{color:var(--txt)}
+  .tag.s1{border-color:rgba(34,211,238,.4)}.tag.s1 b{color:var(--site1)}
+  .tag.s2{border-color:rgba(167,139,250,.4)}.tag.s2 b{color:var(--site2)}
+
+  /* ---- TOC ---- */
+  nav.toc{position:sticky;top:0;z-index:100;backdrop-filter:blur(14px);
+    background:rgba(10,14,23,.82);border-bottom:1px solid var(--line);margin-top:30px}
+  nav.toc .wrap{display:flex;gap:6px;overflow-x:auto;padding:11px 24px;scrollbar-width:none}
+  nav.toc .wrap::-webkit-scrollbar{display:none}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--muted);text-decoration:none;
+    padding:7px 13px;border-radius:8px;transition:.18s;border:1px solid transparent}
+  nav.toc a:hover{color:var(--txt);background:var(--panel)}
+  nav.toc a.active{color:var(--cyan);background:rgba(34,211,238,.1);border-color:rgba(34,211,238,.3)}
+
+  /* ---- Sections ---- */
+  section{padding:52px 0;border-bottom:1px solid var(--line)}
+  section:last-of-type{border-bottom:none}
+  .sec-head{display:flex;align-items:center;gap:16px;margin-bottom:28px}
+  .sec-num{flex:none;width:46px;height:46px;display:grid;place-items:center;border-radius:13px;
+    font-family:var(--mono);font-weight:700;font-size:18px;color:var(--cyan);
+    background:linear-gradient(160deg,rgba(34,211,238,.16),rgba(99,102,241,.10));
+    border:1px solid rgba(34,211,238,.3)}
+  h2.sec-title{margin:0;font-size:clamp(22px,3vw,30px);font-weight:750;letter-spacing:-.01em}
+  h3{font-size:18.5px;font-weight:700;margin:30px 0 12px;color:#fff}
+  h3 .pin{font-family:var(--mono);font-size:13px;color:var(--cyan);margin-right:8px}
+  p{margin:0 0 14px}
+  a.link{color:var(--cyan);text-decoration:none;border-bottom:1px solid rgba(34,211,238,.3)}
+  a.link:hover{border-color:var(--cyan)}
+  strong{color:#fff;font-weight:650}
+
+  /* ---- Cards ---- */
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));
+    border:1px solid var(--line2);border-radius:var(--radius);padding:24px 26px;box-shadow:var(--shadow)}
+  .cards-2{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  .cards-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:820px){.cards-2,.cards-3{grid-template-columns:1fr}}
+
+  /* ---- Callouts ---- */
+  .callout{border-radius:var(--radius-s);padding:16px 20px 16px 18px;margin:18px 0;
+    border:1px solid var(--line2);background:var(--panel);position:relative;
+    border-left-width:4px}
+  .callout .c-head{display:flex;align-items:center;gap:9px;font-weight:700;margin-bottom:6px;font-size:14.5px}
+  .callout .ic{font-size:16px}
+  .callout p:last-child{margin-bottom:0}
+  .callout.warn{border-left-color:var(--amber);background:linear-gradient(90deg,rgba(251,191,36,.07),transparent 70%)}
+  .callout.warn .c-head{color:var(--amber)}
+  .callout.danger{border-left-color:var(--red);background:linear-gradient(90deg,rgba(248,113,113,.08),transparent 70%)}
+  .callout.danger .c-head{color:var(--red)}
+  .callout.good{border-left-color:var(--green);background:linear-gradient(90deg,rgba(52,211,153,.07),transparent 70%)}
+  .callout.good .c-head{color:var(--green)}
+  .callout.info{border-left-color:var(--blue);background:linear-gradient(90deg,rgba(59,130,246,.07),transparent 70%)}
+  .callout.info .c-head{color:var(--blue)}
+  .callout.key{border-left-color:var(--violet);background:linear-gradient(90deg,rgba(167,139,250,.10),transparent 70%)}
+  .callout.key .c-head{color:var(--violet)}
+
+  /* ---- Table ---- */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line2);border-radius:var(--radius-s);margin:16px 0}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:520px}
+  th,td{padding:13px 18px;text-align:left;border-bottom:1px solid var(--line)}
+  thead th{background:var(--panel2);color:var(--muted);font-weight:650;font-size:12.5px;
+    letter-spacing:.06em;text-transform:uppercase}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:rgba(255,255,255,.02)}
+  td.s1{color:var(--site1);font-family:var(--mono)}
+  td.s2{color:var(--site2);font-family:var(--mono)}
+  .mono{font-family:var(--mono)}
+
+  /* ---- Code ---- */
+  .code{position:relative;background:#0a1120;border:1px solid var(--line2);border-radius:var(--radius-s);
+    margin:16px 0;overflow:hidden}
+  .code-head{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);
+    background:rgba(255,255,255,.02)}
+  .code-head .dots{display:flex;gap:6px}
+  .code-head .dots i{width:11px;height:11px;border-radius:50%;display:block}
+  .code-head .dots i:nth-child(1){background:#ff5f56}.code-head .dots i:nth-child(2){background:#ffbd2e}
+  .code-head .dots i:nth-child(3){background:#27c93f}
+  .code-head .fname{font-family:var(--mono);font-size:12.5px;color:var(--dim);margin-left:6px}
+  pre{margin:0;padding:18px 20px;overflow-x:auto;font-family:var(--mono);font-size:13.5px;line-height:1.75}
+  pre code{color:#cfe0f5}
+  .cmt{color:#5e7596;font-style:italic}
+  .cmd{color:var(--cyan)}
+  .arg{color:var(--amber)}
+  .kw{color:var(--violet)}
+  .ok{color:var(--green)}
+
+  /* ---- Steps ---- */
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:14px 0}
+  ol.steps>li{counter-increment:s;position:relative;padding:0 0 0 46px;margin:0 0 16px}
+  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:-2px;width:30px;height:30px;
+    display:grid;place-items:center;border-radius:9px;font-family:var(--mono);font-weight:700;font-size:14px;
+    color:var(--cyan);background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.3)}
+  ol.steps ul{margin:8px 0 0;padding-left:18px;color:var(--muted)}
+  ol.steps li li{margin:4px 0}
+
+  /* path breadcrumb */
+  .path{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;font-family:var(--mono);font-size:13px;
+    background:#0a1120;border:1px solid var(--line2);padding:5px 10px;border-radius:7px;color:var(--muted)}
+  .path b{color:var(--txt)}
+  .path .sep{color:var(--cyan)}
+
+  kbd{font-family:var(--mono);font-size:12.5px;background:#0a1120;border:1px solid var(--line2);
+    border-bottom-width:2px;border-radius:6px;padding:2px 7px;color:var(--cyan)}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;
+    padding:3px 9px;border-radius:999px;border:1px solid var(--line2)}
+  .pill.yes{color:var(--green);border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.08)}
+  .pill.no{color:var(--red);border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.08)}
+
+  /* ---- Diagram ---- */
+  .diagram{background:radial-gradient(700px 380px at 50% 0%,rgba(99,102,241,.10),transparent 70%),#0a1120;
+    border:1px solid var(--line2);border-radius:var(--radius);padding:10px;margin:8px 0 4px;box-shadow:var(--shadow)}
+  .diagram svg{display:block;width:100%;height:auto}
+  .legend{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;padding:14px 8px 6px;font-size:13px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:8px}
+  .legend i{width:22px;height:0;border-top-width:3px;border-top-style:solid;border-radius:2px}
+  .lg-local{border-color:var(--green)}
+  .lg-backup{border-color:var(--red)}
+  .lg-evpn{border-color:var(--violet);border-top-style:dashed}
+  .dash{stroke-dasharray:7 7;animation:flow 1s linear infinite}
+  @keyframes flow{to{stroke-dashoffset:-28}}
+  .flow-local{stroke-dasharray:9 9;animation:flow2 .9s linear infinite}
+  @keyframes flow2{to{stroke-dashoffset:-36}}
+
+  /* reveal */
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+
+  footer{padding:46px 0 70px;color:var(--dim);font-size:13.5px;text-align:center}
+  footer .wrap{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .foot-line{width:60px;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--cyan),var(--violet))}
+
+  ol.refs{counter-reset:r;list-style:none;padding:0;margin:8px 0 0}
+  ol.refs li{counter-increment:r;position:relative;padding:12px 14px 12px 44px;border:1px solid var(--line);
+    border-radius:10px;margin-bottom:10px;background:var(--panel);transition:.18s}
+  ol.refs li:hover{border-color:var(--line2);background:var(--panel2)}
+  ol.refs li::before{content:counter(r);position:absolute;left:12px;top:12px;width:22px;height:22px;
+    display:grid;place-items:center;border-radius:6px;font-family:var(--mono);font-size:12px;color:var(--cyan);
+    background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.3)}
+  ol.refs a{color:var(--cyan);text-decoration:none;word-break:break-all;font-size:12.5px;font-family:var(--mono)}
+  ol.refs .rt{display:block;color:var(--txt);font-weight:600;margin-bottom:3px;font-size:14px}
+
+  @media(max-width:560px){
+    .card{padding:18px}
+    section{padding:40px 0}
+    .sec-head{gap:12px}.sec-num{width:40px;height:40px}
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<header class="hero">
+  <div class="hero-bg"></div>
+  <div class="wrap hero-inner">
+    <div class="eyebrow"><span class="dot"></span>Cisco ACI · Multi-Site · L3Out Locality</div>
+    <h1 class="title">동일 경로에 대해 <span class="grad">각 사이트가 자기 L3Out을</span><br>우선하도록 만드는 방법</h1>
+    <p class="subtitle">Per-Site Locality 구성 가이드 — 동일 infra ASN(iBGP EVPN) 환경에서 Site1 Leaf는 Site1 L3Out을, Site2 Leaf는 Site2 L3Out을 각각 우선하고 Remote는 백업으로만 사용하도록 설계한다.</p>
+    <div class="hero-tags">
+      <span class="tag s1">Site 1 ASN <b>65001</b></span>
+      <span class="tag s2">Site 2 ASN <b>65001</b></span>
+      <span class="tag">Inter-Site <b>iBGP EVPN</b></span>
+      <span class="tag">L3Out <b>독립 · OSPF</b></span>
+      <span class="tag">핵심 도구 <b>BGP Weight</b></span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#env">0 · 환경</a>
+    <a href="#why">1 · 원인·원리</a>
+    <a href="#fix">2 · 해결책</a>
+    <a href="#proc">3 · APIC 절차</a>
+    <a href="#match">3-A · Match/Set Rule</a>
+    <a href="#persite">3-B · 사이트별 적용</a>
+    <a href="#te">3-C · TE / Order</a>
+    <a href="#ospf">4 · OSPF Cost</a>
+    <a href="#verify">5 · 검증</a>
+    <a href="#scope">6 · APIC vs NDO</a>
+    <a href="#flow">7 · 워크플로우</a>
+    <a href="#ref">8 · 참고문서</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <!-- 0 -->
+  <section id="env" class="reveal">
+    <div class="sec-head"><div class="sec-num">0</div><h2 class="sec-title">대상 환경 &amp; 목표</h2></div>
+    <div class="cards-2">
+      <div class="card">
+        <h3 style="margin-top:0">현재 구성</h3>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>항목</th><th>Site 1</th><th>Site 2</th></tr></thead>
+            <tbody>
+              <tr><td>Infra BGP ASN</td><td class="s1">65001</td><td class="s2">65001</td></tr>
+              <tr><td>Inter-Site 제어평면</td><td colspan="2" class="mono" style="color:var(--violet)">동일 ASN → iBGP EVPN</td></tr>
+              <tr><td>L3Out</td><td class="s1">독립 구성</td><td class="s2">독립 구성</td></tr>
+              <tr><td>L3Out 프로토콜</td><td class="s1">OSPF</td><td class="s2">OSPF</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">증상 &amp; 목표</h3>
+        <div class="callout danger" style="margin-top:4px">
+          <div class="c-head"><span class="ic">⚠</span>증상</div>
+          <p>외부에서 OSPF로 학습된 경로가 cost로 인해 <strong>Remote(타 사이트) L3Out을 우선</strong>하는 경우 발생.</p>
+        </div>
+        <div class="callout good">
+          <div class="c-head"><span class="ic">◎</span>목표 — Per-Site Locality</div>
+          <p><strong>Site1 Leaf → Site1 L3Out</strong>, <strong>Site2 Leaf → Site2 L3Out</strong> 을 각각 우선. Remote L3Out은 <strong>백업</strong>으로만 사용.</p>
+        </div>
+      </div>
+    </div>
+    <div class="callout key">
+      <div class="c-head"><span class="ic">★</span>가장 중요한 포인트</div>
+      <p>이것은 <strong>"한 사이트를 전역 우선"</strong>하는 것이 <strong>아니다</strong>. 각 사이트가 <strong>자기 로컬 L3Out</strong>을 우선해야 한다. 따라서 <strong>전역으로 전파되는 Local Preference를 쓰면 안 된다</strong> — <strong>사이트 로컬에만 머무는 BGP Weight</strong> 가 정답이다.</p>
+    </div>
+  </section>
+
+  <!-- 1 -->
+  <section id="why" class="reveal">
+    <div class="sec-head"><div class="sec-num">1</div><h2 class="sec-title">근본 원인 &amp; 동작 원리</h2></div>
+
+    <h3><span class="pin">1-0</span>전제 — 두 L3Out이 서로 보이려면 Intersite L3Out이 필요</h3>
+    <div class="cards-2">
+      <div class="card">
+        <span class="pill no">Intersite L3Out 미구성</span>
+        <p style="margin-top:12px">두 사이트 L3Out은 <strong>완전 독립</strong>. Site1 Leaf는 Site2 L3Out 경로를 <strong>아예 보지 못함</strong> → 자동으로 로컬만 사용(문제 없음).</p>
+      </div>
+      <div class="card">
+        <span class="pill yes">Intersite L3Out 구성</span>
+        <p style="margin-top:12px">한 사이트 외부 prefix가 EVPN으로 타 사이트에 <strong>백업 경로로 광고됨</strong>. 이때부터 "어느 L3Out을 쓸지" 선택이 발생.</p>
+      </div>
+    </div>
+    <div class="callout info">
+      <div class="c-head"><span class="ic">ℹ</span>역추론</div>
+      <p>Remote L3Out이 보이고 그게 우선되는 상황이면 → <strong>Intersite L3Out이 켜져 있다</strong>는 의미다.</p>
+    </div>
+
+    <h3><span class="pin">1-1</span>기본 동작 — 사이트 로컬 우선은 원래 자동</h3>
+    <p>동일 외부 prefix를 양쪽 L3Out이 광고하면, fabric leaf에는 두 경로가 보인다.</p>
+    <div class="cards-2">
+      <div class="card" style="border-color:rgba(52,211,153,.35)">
+        <div class="c-head" style="color:var(--green);font-weight:700;margin-bottom:8px">① 로컬 BL 경유 <span class="pill yes">선호</span></div>
+        <p style="color:var(--muted);margin:0">로컬 L3Out → OSPF → fabric에 <strong>로컬 originate</strong>, <strong>Weight 높음</strong>, 로컬 BL TEP next-hop, 짧은 IS-IS 메트릭.</p>
+      </div>
+      <div class="card" style="border-color:rgba(248,113,113,.3)">
+        <div class="c-head" style="color:var(--red);font-weight:700;margin-bottom:8px">② Remote BL 경유 <span class="pill no">백업</span></div>
+        <p style="color:var(--muted);margin:0">EVPN으로 <strong>import</strong>된 타 사이트 경로, <strong>Weight 0</strong>.</p>
+      </div>
+    </div>
+    <div class="callout good"><div class="c-head"><span class="ic">✓</span>결론</div>
+      <p>각 사이트 Leaf는 로컬 originate·높은 Weight 경로를 우선 → <strong>Per-site locality는 원래 기본 동작</strong>이다.</p>
+    </div>
+
+    <h3><span class="pin">1-2</span>그런데 왜 Remote가 우선되나</h3>
+    <p>기본 로컬 우선이 깨지는 조건:</p>
+    <div class="cards-2">
+      <div class="card"><strong>OSPF cost → MED 전달</strong><p style="color:var(--muted);margin:6px 0 0">redistribution 시 로컬 경로 메트릭이 Remote보다 나빠짐 (가장 흔한 원인)</p></div>
+      <div class="card"><strong>Host route / prefix 광고 차이</strong><p style="color:var(--muted);margin:6px 0 0">특정 prefix가 더 정밀하게 광고되어 선택 역전</p></div>
+      <div class="card"><strong>Intersite L3Out · transit 구성</strong><p style="color:var(--muted);margin:6px 0 0">경로 선택 이상 유발</p></div>
+      <div class="card"><strong>외부 BGP 속성</strong><p style="color:var(--muted);margin:6px 0 0">MED / AS-Path가 선택에 영향</p></div>
+    </div>
+
+    <h3><span class="pin">1-3</span>해결의 핵심 — Local Preference가 아니라 <span style="color:var(--cyan)">Weight</span></h3>
+    <div class="cards-2">
+      <div class="card" style="border-color:rgba(248,113,113,.4)">
+        <div class="c-head" style="color:var(--red);font-weight:700;font-size:15px"><span class="ic">✗</span>Local Preference (전역 전파)</div>
+        <p style="margin:10px 0 0;color:var(--muted)"><strong>iBGP이므로 EVPN을 타고 타 사이트로 전파</strong>. Site1에 Local-Pref를 높이면 <strong style="color:var(--red)">Site2 Leaf까지 Site1 L3Out을 우선</strong> → per-site locality 붕괴(전역 우선).</p>
+      </div>
+      <div class="card" style="border-color:rgba(52,211,153,.5)">
+        <div class="c-head" style="color:var(--green);font-weight:700;font-size:15px"><span class="ic">✓</span>BGP Weight (사이트 로컬)</div>
+        <p style="margin:10px 0 0;color:var(--muted)"><strong>비전이(non-transitive)</strong> 속성 — <strong>어떤 BGP peer에게도 광고되지 않고</strong> 해당 Leaf/사이트 로컬에만 머문다. 각 사이트가 <strong style="color:var(--green)">독립적으로 자기 로컬 L3Out을 우선</strong>.</p>
+      </div>
+    </div>
+
+    <!-- DIAGRAM -->
+    <div class="diagram">
+      <svg viewBox="0 0 900 430" role="img" aria-label="Per-site locality 토폴로지">
+        <defs>
+          <linearGradient id="gS1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e2a33"/><stop offset="1" stop-color="#0a1822"/></linearGradient>
+          <linearGradient id="gS2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#231a3d"/><stop offset="1" stop-color="#140f22"/></linearGradient>
+          <marker id="arrG" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#34d399"/></marker>
+          <marker id="arrR" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#f87171"/></marker>
+          <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+
+        <!-- external cloud -->
+        <g transform="translate(355,12)">
+          <rect x="0" y="0" width="190" height="46" rx="23" fill="#0a1120" stroke="#27395a"/>
+          <text x="95" y="22" text-anchor="middle" fill="#9fb0cc" font-size="12" font-family="monospace">External Network</text>
+          <text x="95" y="37" text-anchor="middle" fill="#fbbf24" font-size="12" font-family="monospace">prefix 10.0.0.0/8</text>
+        </g>
+
+        <!-- SITE 1 -->
+        <g>
+          <rect x="22" y="86" width="378" height="300" rx="18" fill="url(#gS1)" stroke="#22d3ee" stroke-opacity=".5"/>
+          <text x="44" y="116" fill="#22d3ee" font-size="15" font-weight="700" font-family="monospace">SITE 1 · ASN 65001</text>
+          <!-- L3Out BL -->
+          <g transform="translate(60,150)">
+            <rect width="120" height="52" rx="10" fill="#0a1822" stroke="#22d3ee"/>
+            <text x="60" y="22" text-anchor="middle" fill="#e7ecf5" font-size="12" font-family="monospace">L3Out BL-1</text>
+            <text x="60" y="39" text-anchor="middle" fill="#22d3ee" font-size="11" font-family="monospace">OSPF</text>
+          </g>
+          <!-- leaf -->
+          <g transform="translate(60,300)">
+            <rect width="120" height="54" rx="10" fill="#0a1822" stroke="#22d3ee" stroke-opacity=".7"/>
+            <text x="60" y="22" text-anchor="middle" fill="#e7ecf5" font-size="12" font-family="monospace">Leaf (S1)</text>
+            <text x="60" y="40" text-anchor="middle" fill="#34d399" font-size="10.5" font-family="monospace">→ uses BL-1</text>
+          </g>
+          <!-- local path arrow -->
+          <path d="M120,300 L120,204" fill="none" stroke="#34d399" stroke-width="3" class="flow-local" marker-end="url(#arrG)"/>
+          <text x="132" y="258" fill="#34d399" font-size="11" font-family="monospace">local</text>
+          <text x="132" y="272" fill="#34d399" font-size="11" font-family="monospace">W=100</text>
+          <!-- weight badge -->
+          <g transform="translate(232,158)">
+            <rect width="120" height="38" rx="8" fill="rgba(52,211,153,.1)" stroke="#34d399"/>
+            <text x="60" y="16" text-anchor="middle" fill="#34d399" font-size="10.5" font-family="monospace">Set Weight 100</text>
+            <text x="60" y="30" text-anchor="middle" fill="#6b7d9c" font-size="9.5" font-family="monospace">site-local</text>
+          </g>
+        </g>
+
+        <!-- SITE 2 -->
+        <g>
+          <rect x="500" y="86" width="378" height="300" rx="18" fill="url(#gS2)" stroke="#a78bfa" stroke-opacity=".5"/>
+          <text x="678" y="116" text-anchor="end" fill="#a78bfa" font-size="15" font-weight="700" font-family="monospace">SITE 2 · ASN 65001</text>
+          <g transform="translate(720,150)">
+            <rect width="120" height="52" rx="10" fill="#140f22" stroke="#a78bfa"/>
+            <text x="60" y="22" text-anchor="middle" fill="#e7ecf5" font-size="12" font-family="monospace">L3Out BL-2</text>
+            <text x="60" y="39" text-anchor="middle" fill="#a78bfa" font-size="11" font-family="monospace">OSPF</text>
+          </g>
+          <g transform="translate(720,300)">
+            <rect width="120" height="54" rx="10" fill="#140f22" stroke="#a78bfa" stroke-opacity=".7"/>
+            <text x="60" y="22" text-anchor="middle" fill="#e7ecf5" font-size="12" font-family="monospace">Leaf (S2)</text>
+            <text x="60" y="40" text-anchor="middle" fill="#34d399" font-size="10.5" font-family="monospace">→ uses BL-2</text>
+          </g>
+          <path d="M780,300 L780,204" fill="none" stroke="#34d399" stroke-width="3" class="flow-local" marker-end="url(#arrG)"/>
+          <text x="724" y="258" text-anchor="end" fill="#34d399" font-size="11" font-family="monospace">local</text>
+          <text x="724" y="272" text-anchor="end" fill="#34d399" font-size="11" font-family="monospace">W=100</text>
+          <g transform="translate(548,158)">
+            <rect width="120" height="38" rx="8" fill="rgba(52,211,153,.1)" stroke="#34d399"/>
+            <text x="60" y="16" text-anchor="middle" fill="#34d399" font-size="10.5" font-family="monospace">Set Weight 100</text>
+            <text x="60" y="30" text-anchor="middle" fill="#6b7d9c" font-size="9.5" font-family="monospace">site-local</text>
+          </g>
+        </g>
+
+        <!-- ext links -->
+        <path d="M120,150 C120,90 360,80 430,58" fill="none" stroke="#27395a" stroke-width="2"/>
+        <path d="M780,150 C780,90 540,80 470,58" fill="none" stroke="#27395a" stroke-width="2"/>
+
+        <!-- Inter-site EVPN (backup) -->
+        <path d="M180,176 C360,250 540,250 720,176" fill="none" stroke="#a78bfa" stroke-width="2.5" class="dash" opacity=".85"/>
+        <g transform="translate(398,250)">
+          <rect x="0" y="0" width="104" height="40" rx="9" fill="#0a1120" stroke="#a78bfa" stroke-opacity=".6"/>
+          <text x="52" y="17" text-anchor="middle" fill="#a78bfa" font-size="10.5" font-family="monospace">MP-BGP EVPN</text>
+          <text x="52" y="31" text-anchor="middle" fill="#6b7d9c" font-size="9.5" font-family="monospace">iBGP · backup W=0</text>
+        </g>
+
+        <!-- spine icons hint -->
+        <text x="450" y="412" text-anchor="middle" fill="#6b7d9c" font-size="11" font-family="monospace">Weight는 EVPN을 건너 전파되지 않음 → 각 사이트가 독립적으로 로컬 우선</text>
+      </svg>
+      <div class="legend">
+        <span><i class="lg-local"></i> 로컬 경로 (Weight 100, 선호)</span>
+        <span><i class="lg-evpn"></i> Inter-Site EVPN 백업 (Weight 0)</span>
+      </div>
+    </div>
+
+    <h3 id="verify-weight"><span class="pin">1-4</span>✅ 검증 — "iBGP인데 Weight가 사이트 간 전달 안 되는 게 맞나?"</h3>
+    <div class="callout good" style="border-left-width:5px">
+      <div class="c-head" style="font-size:15.5px"><span class="ic">✓✓✓</span>결론: 맞다 — Weight는 iBGP·eBGP 어떤 peer에게도 절대 전달되지 않는다 <span style="font-weight:500;color:var(--dim)">(3중 확인)</span></div>
+    </div>
+    <div class="cards-3">
+      <div class="card" style="border-color:rgba(99,102,241,.4)">
+        <div class="c-head" style="color:var(--indigo);font-weight:700"><span class="ic">①</span>BGP 프로토콜 (RFC 4271)</div>
+        <p style="margin:10px 0 0;color:var(--muted);font-size:14px">Weight는 <strong>BGP path attribute가 아니다.</strong> RFC 4271의 transitive/non-transitive attribute 목록에 <strong>존재하지 않음.</strong> <strong>BGP UPDATE 메시지에 인코딩되지 않는</strong> 순수 로컬 RIB 선택값 → 메시지에 안 실리므로 전달 자체가 불가.</p>
+      </div>
+      <div class="card" style="border-color:rgba(34,211,238,.4)">
+        <div class="c-head" style="color:var(--cyan);font-weight:700"><span class="ic">②</span>Cisco 공식문서 213285</div>
+        <p style="margin:10px 0 0;color:var(--muted);font-size:14px">"Understand the Importance of BGP Weight Path Attribute" (2025-04 recert) 원문 확인.</p>
+      </div>
+      <div class="card" style="border-color:rgba(167,139,250,.4)">
+        <div class="c-head" style="color:var(--violet);font-weight:700"><span class="ic">③</span>ACI Multi-Site 동작</div>
+        <p style="margin:10px 0 0;color:var(--muted);font-size:14px">spine의 <strong>EVPN translation은 Weight를 재생성/전파하지 않음.</strong> community→weight 매핑·table-map 등 remote에서 weight를 <strong>복원하는 자동 메커니즘 없음</strong> (Multi-Site Troubleshooting Guide).</p>
+      </div>
+    </div>
+
+    <div class="code">
+      <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="fname">Cisco Doc ID 213285 — 원문 인용</span></div>
+<pre><code><span class="cmt">"Weight is a Cisco-specific parameter and it is only</span>
+<span class="cmt"> LOCALLY SIGNIFICANT in the Router where it is configured."</span>
+
+<span class="cmt">"The weight is assigned locally to the router. The value is</span>
+<span class="cmt"> NOT PROPAGATED or carried through any of the route updates."</span>
+
+<span class="cmt"># → BGP best-path 알고리즘에서 가장 먼저 비교되는 값 (highest wins)</span></code></pre>
+    </div>
+
+    <h4 style="font-size:16px;margin:24px 0 8px;color:#fff">대조 — 왜 Local Preference는 안 되는가</h4>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>속성</th><th>BGP 메시지 인코딩</th><th>iBGP peer 전달</th><th>eBGP peer 전달</th><th>iBGP Multi-Site 결과</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="mono" style="color:var(--green)">Weight</td>
+            <td><span class="pill no" style="color:var(--green);border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.08)">❌ attribute 아님</span></td>
+            <td style="color:var(--red);font-family:var(--mono)">✗ 안 됨</td>
+            <td style="color:var(--red);font-family:var(--mono)">✗ 안 됨</td>
+            <td style="color:var(--green)"><strong>사이트 로컬 유지</strong> ✅</td>
+          </tr>
+          <tr>
+            <td class="mono" style="color:var(--red)">Local Preference</td>
+            <td><span class="pill no">Well-known attr (type 5)</span></td>
+            <td style="color:var(--amber);font-family:var(--mono)"><strong>✓ 전달됨</strong></td>
+            <td style="color:var(--red);font-family:var(--mono)">✗ 안 됨</td>
+            <td style="color:var(--red)"><strong>타 사이트 전파 → 전역 우선</strong> ❌</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout key">
+      <div class="c-head"><span class="ic">★</span>핵심 차이</div>
+      <p>동일 ASN이라 두 사이트가 iBGP인데, <strong>Local-Pref는 iBGP 내부에서 전달되는 속성</strong>이라 Site2까지 넘어간다. 반면 <strong>Weight는 BGP 메시지에 아예 실리지 않아</strong> ASN이 같든 다르든 무관하게 사이트 로컬에만 머문다.</p>
+    </div>
+    <div class="callout good" style="margin-bottom:0">
+      <div class="c-head"><span class="ic">✓</span>최종 정리</div>
+      <p>Site1 BL에 Weight 100 설정 → <strong>Site1 Leaf들만</strong> 영향. Site2 Leaf들은 같은 prefix를 iBGP EVPN으로 학습하되 <strong>Weight는 기본값 0</strong> 그대로. 양쪽에 각각 100을 주면 각 사이트가 독립적으로 자기 BL 우선. ✅</p>
+    </div>
+
+    <h3 id="where-weight"><span class="pin">1-5</span>그럼 Weight는 "어디에 설정되어" 동작하나</h3>
+    <div class="callout key">
+      <div class="c-head"><span class="ic">★</span>관점 전환</div>
+      <p>Weight는 <strong>"보내는 값"이 아니라</strong>, 경로를 받아들이는 라우터(Leaf)가 <strong>자기 BGP 테이블(RIB-In)에 저장할 때 로컬로 붙이는 표식</strong>이다. 그래서 "어디로 광고되나"가 아니라 <strong style="color:var(--cyan)">"어느 Leaf에서 설정되나"</strong> 가 전부다.</p>
+    </div>
+    <p><strong>동작 위치 = 각 사이트의 Border Leaf (BL)</strong> — BL이 OSPF 외부경로를 fabric MP-BGP로 <strong>redistribution(Interleak)하는 그 순간</strong>, 해당 BL의 BGP 프로세스가 자기 RIB에 경로를 넣으면서 Weight를 부여한다. 이 값은 그 BL(및 같은 fabric 내 Leaf)에만 존재하고 best-path에서 <strong>가장 먼저 비교</strong>된다.</p>
+
+    <!-- where-weight pipeline diagram -->
+    <div class="diagram" style="padding:18px 10px">
+      <svg viewBox="0 0 900 360" role="img" aria-label="Weight 설정 위치 및 EVPN 광고 시 미포함">
+        <defs>
+          <marker id="arrW" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/></marker>
+          <marker id="arrWp" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a78bfa"/></marker>
+        </defs>
+
+        <!-- Site1 BL column -->
+        <g transform="translate(30,20)">
+          <rect width="430" height="320" rx="16" fill="#0e2530" stroke="#22d3ee" stroke-opacity=".45"/>
+          <text x="20" y="30" fill="#22d3ee" font-size="13.5" font-weight="700" font-family="monospace">SITE 1 · Border Leaf</text>
+
+          <!-- step1 OSPF -->
+          <g transform="translate(135,44)">
+            <rect width="160" height="42" rx="9" fill="#0a1822" stroke="#fbbf24" stroke-opacity=".75"/>
+            <text x="80" y="18" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="monospace">OSPF 외부경로 수신</text>
+            <text x="80" y="33" text-anchor="middle" fill="#6b7d9c" font-size="10.5" font-family="monospace">10.0.0.0/8</text>
+          </g>
+          <path d="M215,86 L215,108" stroke="#22d3ee" stroke-width="2.5" marker-end="url(#arrW)"/>
+
+          <!-- step2 route-map -->
+          <g transform="translate(110,110)">
+            <rect width="210" height="46" rx="9" fill="rgba(52,211,153,.1)" stroke="#34d399"/>
+            <text x="105" y="19" text-anchor="middle" fill="#34d399" font-size="11.5" font-weight="700" font-family="monospace">Interleak route-map</text>
+            <text x="105" y="36" text-anchor="middle" fill="#cfe0f5" font-size="11.5" font-family="monospace">set weight 100</text>
+          </g>
+          <path d="M215,156 L215,178" stroke="#22d3ee" stroke-width="2.5" marker-end="url(#arrW)"/>
+
+          <!-- step3 RIB -->
+          <g transform="translate(70,180)">
+            <rect width="290" height="62" rx="10" fill="#0a1120" stroke="#22d3ee"/>
+            <text x="145" y="20" text-anchor="middle" fill="#22d3ee" font-size="11.5" font-weight="700" font-family="monospace">Site1 BL · BGP 테이블 (RIB)</text>
+            <text x="145" y="40" text-anchor="middle" fill="#cfe0f5" font-size="11" font-family="monospace">10.0.0.0/8 ... Weight 100</text>
+            <text x="145" y="54" text-anchor="middle" fill="#6b7d9c" font-size="9.5" font-family="monospace">★ 이 fabric 안에서만 존재</text>
+          </g>
+
+          <!-- local leaves use -->
+          <g transform="translate(115,258)">
+            <rect width="200" height="44" rx="9" fill="rgba(52,211,153,.08)" stroke="#34d399" stroke-opacity=".7"/>
+            <text x="100" y="19" text-anchor="middle" fill="#34d399" font-size="11" font-family="monospace">Site1 Leaf 전체</text>
+            <text x="100" y="35" text-anchor="middle" fill="#34d399" font-size="11" font-family="monospace">→ Weight 100 적용 · 로컬 우선</text>
+          </g>
+          <path d="M215,242 L215,258" stroke="#34d399" stroke-width="2" marker-end="url(#arrW)"/>
+        </g>
+
+        <!-- EVPN advertise arrow -->
+        <path d="M460,211 L560,211" stroke="#a78bfa" stroke-width="2.5" class="dash" marker-end="url(#arrWp)"/>
+        <g transform="translate(462,150)">
+          <rect width="96" height="48" rx="8" fill="#0a1120" stroke="#a78bfa" stroke-opacity=".6"/>
+          <text x="48" y="19" text-anchor="middle" fill="#a78bfa" font-size="10" font-family="monospace">EVPN UPDATE</text>
+          <text x="48" y="32" text-anchor="middle" fill="#6b7d9c" font-size="9" font-family="monospace">prefix·NH·AS-path</text>
+          <text x="48" y="43" text-anchor="middle" fill="#f87171" font-size="9" font-family="monospace">✗ no Weight</text>
+        </g>
+
+        <!-- Site2 column -->
+        <g transform="translate(560,20)">
+          <rect width="310" height="320" rx="16" fill="#231a3d" stroke="#a78bfa" stroke-opacity=".45"/>
+          <text x="290" y="30" text-anchor="end" fill="#a78bfa" font-size="13.5" font-weight="700" font-family="monospace">SITE 2 · Leaf</text>
+
+          <g transform="translate(40,180)">
+            <rect width="230" height="62" rx="10" fill="#0a1120" stroke="#a78bfa"/>
+            <text x="115" y="20" text-anchor="middle" fill="#a78bfa" font-size="11.5" font-weight="700" font-family="monospace">Site2 Leaf · BGP 테이블</text>
+            <text x="115" y="40" text-anchor="middle" fill="#cfe0f5" font-size="11" font-family="monospace">10.0.0.0/8 ... Weight 0</text>
+            <text x="115" y="54" text-anchor="middle" fill="#6b7d9c" font-size="9.5" font-family="monospace">메시지에 Weight 없음 → 기본값 0</text>
+          </g>
+          <g transform="translate(55,258)">
+            <rect width="200" height="44" rx="9" fill="rgba(248,113,113,.07)" stroke="#f87171" stroke-opacity=".5"/>
+            <text x="100" y="19" text-anchor="middle" fill="#cfe0f5" font-size="11" font-family="monospace">Site2는 자기 BL을</text>
+            <text x="100" y="35" text-anchor="middle" fill="#34d399" font-size="11" font-family="monospace">Weight 100으로 별도 우선</text>
+          </g>
+          <path d="M210,242 L155,258" stroke="#6b7d9c" stroke-width="1.5" fill="none" stroke-dasharray="4 4"/>
+        </g>
+      </svg>
+      <div class="legend">
+        <span><i class="lg-evpn"></i> EVPN UPDATE — prefix/NH/AS-path만 전송 (Weight 미포함)</span>
+      </div>
+    </div>
+
+    <div class="cards-2">
+      <div class="card">
+        <div class="c-head" style="font-weight:700;margin-bottom:8px">같은 prefix인데 사이트마다 Weight가 다른 이유</div>
+        <div class="tbl-wrap" style="margin:0">
+          <table>
+            <thead><tr><th>위치</th><th>Weight</th><th>왜</th></tr></thead>
+            <tbody>
+              <tr><td class="s1">Site1 Leaf (BL 포함)</td><td class="mono" style="color:var(--green)"><strong>100</strong></td><td style="font-size:13px">BL이 redistribution 시 로컬 설정 (로컬 originate)</td></tr>
+              <tr><td class="s2">Site2 Leaf</td><td class="mono" style="color:var(--red)"><strong>0</strong></td><td style="font-size:13px">EVPN UPDATE에 Weight 없음 → iBGP 학습 기본값</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:12px 0 0;color:var(--muted);font-size:14px">→ 동일 값이 전파된 게 아니라, <strong>각 Leaf가 자기 관점에서 독립적으로 Weight를 매긴 결과</strong>.</p>
+      </div>
+      <div class="card">
+        <div class="c-head" style="font-weight:700;margin-bottom:10px">비유 — 운송장 vs 창고 스티커</div>
+        <div class="callout danger" style="margin:0 0 12px"><p style="margin:0"><strong>Local Preference</strong> = 운송장 → iBGP 트럭에 실려 <strong>Site2 창고까지 따라감</strong> ❌</p></div>
+        <div class="callout good" style="margin:0"><p style="margin:0"><strong>Weight</strong> = 창고 내부 스티커 → Site1이 붙인 건 <strong>Site1에만</strong>, Site2는 자기 스티커(기본 0)를 따로 붙임 ✅</p></div>
+      </div>
+    </div>
+    <div class="callout info" style="margin-bottom:0">
+      <div class="c-head"><span class="ic">ℹ</span>"사이트 로컬에 머문다"의 정확한 의미</div>
+      <p><strong>전파를 차단</strong>한다는 뜻이 아니라, <strong>애초에 전파 대상이 아니고 각 Leaf가 자체적으로 RIB-In에 생성</strong>한다는 의미. 그래서 ASN이 같아도(iBGP) 전혀 새지 않는다.</p>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section id="fix" class="reveal">
+    <div class="sec-head"><div class="sec-num">2</div><h2 class="sec-title">권장 해결책 <span style="font-size:15px;color:var(--dim);font-weight:500">(우선순위 순)</span></h2></div>
+    <div class="grid">
+      <div class="card" style="border-color:rgba(52,211,153,.45)">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span class="pill yes">방안 A · 핵심</span>
+          <h3 style="margin:0">Route Map으로 <span style="color:var(--cyan)">Weight</span> 상향 — Per-Site Locality</h3>
+        </div>
+        <p style="margin-top:12px">각 사이트에서 <strong>로컬 redistribution 경로에 높은 BGP Weight 부여</strong>(예: 100). Weight는 <strong>사이트 로컬에만 머물고 타 사이트로 전파되지 않으므로</strong>, Site1·Site2가 각자 자기 로컬 L3Out을 독립적으로 우선한다.</p>
+        <div class="callout danger" style="margin-bottom:0">
+          <div class="c-head"><span class="ic">✗</span>Set Preference(Local Preference) 사용 금지</div>
+          <p>iBGP EVPN으로 전파되어 전역 우선이 되며 per-site locality가 깨진다.</p>
+        </div>
+      </div>
+
+      <div class="cards-3">
+        <div class="card"><span class="pill" style="color:var(--blue);border-color:rgba(59,130,246,.4)">방안 B · 보조</span>
+          <h3 style="margin:12px 0 6px;font-size:16px">OSPF Cost 튜닝</h3>
+          <p style="color:var(--muted);margin:0;font-size:14px">BL에서 로컬 L3Out OSPF interface cost를 낮춰 MED를 줄임. 방안 A와 병행 권장.</p>
+        </div>
+        <div class="card"><span class="pill" style="color:var(--blue);border-color:rgba(59,130,246,.4)">방안 C · 인그레스</span>
+          <h3 style="margin:12px 0 6px;font-size:16px">Host Route Advertisement</h3>
+          <p style="color:var(--muted);margin:0;font-size:14px">BD 단위 활성화(ACI 4.0+)로 리턴 트래픽이 EP 위치 사이트로 들어오게 유도. 비대칭 라우팅 완화.</p>
+        </div>
+        <div class="card"><span class="pill" style="color:var(--amber);border-color:rgba(251,191,36,.4)">방안 D · 설계</span>
+          <h3 style="margin:12px 0 6px;font-size:16px">Intersite L3Out 검토</h3>
+          <p style="color:var(--muted);margin:0;font-size:14px">Remote 백업이 불필요하면 해제 → 두 L3Out 완전 독립 → per-site locality 자동 보장(가장 단순).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section id="proc" class="reveal">
+    <div class="sec-head"><div class="sec-num">3</div><h2 class="sec-title">방안 A 상세 절차 <span style="font-size:15px;color:var(--dim);font-weight:500">(APIC GUI)</span></h2></div>
+    <div class="callout info"><div class="c-head"><span class="ic">ℹ</span>적용 범위</div><p>양쪽 사이트 각각 적용하거나, NDO에서 Route Map 템플릿으로 중앙 배포 가능.</p></div>
+
+    <h3><span class="pin">3-1</span>Route Map (Route Control) 생성</h3>
+    <div class="path"><b>Tenant</b><span class="sep">›</span><b>Tenant</b><span class="sep">›</span>Policies<span class="sep">›</span>Protocol<span class="sep">›</span><b>Route Maps for Route Control</b></div>
+    <ol class="steps" style="margin-top:16px">
+      <li>위 경로에서 우클릭 → <strong>Create Route Maps for Route Control</strong></li>
+      <li>이름 입력</li>
+      <li><strong>Route Control Context</strong> 추가
+        <ul>
+          <li><strong>Order</strong>, <strong>Name</strong> 설정</li>
+          <li><strong>Action</strong> = <kbd>Permit</kbd></li>
+          <li><strong>Match Rule</strong>: 대상 외부 prefix(또는 routing policy) 매칭</li>
+          <li><strong>Set Rule</strong>: BGP <kbd>Set Weight = 100</kbd> &nbsp;←&nbsp; <span style="color:var(--green)">사이트 로컬 전용, 전파 안 됨</span></li>
+        </ul>
+      </li>
+      <li>Submit</li>
+    </ol>
+
+    <div class="card" style="margin:8px 0 4px">
+      <div class="c-head" style="font-weight:700;margin-bottom:12px">Set Rule 선택 기준 — 무엇이 사이트 로컬에 머무는가</div>
+      <div class="tbl-wrap" style="margin:0">
+        <table>
+          <thead><tr><th>Set Rule</th><th>전파 여부</th><th>per-site locality 적합</th></tr></thead>
+          <tbody>
+            <tr><td class="mono" style="color:var(--green)">Set Weight</td><td><span class="pill no" style="color:var(--green);border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.08)">전파 X (site-local)</span></td><td><span class="pill yes">✓ 사용</span></td></tr>
+            <tr><td class="mono">Set Preference (Local-Pref)</td><td><span class="pill no">전파 O</span></td><td><span class="pill no">✗ 금지</span></td></tr>
+            <tr><td class="mono">Set Community</td><td><span class="pill no">전파 O</span></td><td><span class="pill no">✗</span></td></tr>
+            <tr><td class="mono">Set AS Path</td><td><span class="pill no">전파 O</span></td><td><span class="pill no">✗ (iBGP 무효)</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3><span class="pin">3-2</span>L3Out에 적용 (Import / Interleak 방향)</h3>
+    <div class="path"><b>Tenant</b><span class="sep">›</span><b>Tenant</b><span class="sep">›</span>Networking<span class="sep">›</span>L3Outs<span class="sep">›</span><b>L3Out</b><span class="sep">›</span>Policy 탭</div>
+    <ol class="steps" style="margin-top:16px">
+      <li><strong>Policy</strong> 탭 진입</li>
+      <li>OSPF 경로의 경우 <strong>Route Profile for Interleak</strong> 필드에 위 Route Map 선택
+        <ul><li>Interleak = OSPF → fabric MP-BGP 재분배 지점. 여기서 로컬 경로에 Weight를 박는다.</li></ul>
+      </li>
+      <li><strong>양쪽 사이트 각각</strong> 동일하게 적용 (Site1 L3Out, Site2 L3Out 모두)</li>
+      <li>Submit</li>
+    </ol>
+    <div class="callout key"><div class="c-head"><span class="ic">↔</span>방향 정리</div>
+      <p><span class="mono" style="color:var(--cyan)">default-export</span> = fabric→외부 광고 · <span class="mono" style="color:var(--cyan)">default-import (=Interleak)</span> = 외부(OSPF)→fabric 학습. <strong>로컬 우선은 Import/Interleak 방향</strong>에서 Weight를 설정.</p>
+    </div>
+
+    <h3><span class="pin">3-3</span>동작 확인 (Per-Site)</h3>
+    <div class="callout good"><div class="c-head"><span class="ic">✓</span>결과</div>
+      <p>각 사이트는 로컬 redistribution 경로에 <strong>Weight 100</strong>, EVPN으로 들어온 Remote 경로는 <strong>Weight 0</strong>. Weight는 전파되지 않으므로 <strong>Site1·Site2가 각자 로컬 BL 경로를 best-path로 선택</strong> → per-site locality 달성.</p>
+    </div>
+  </section>
+
+  <!-- 3-A : Match / Set Rule -->
+  <section id="match" class="reveal">
+    <div class="sec-head"><div class="sec-num">3A</div><h2 class="sec-title">Match Rule / Set Rule 상세 구성</h2></div>
+    <div class="callout key"><div class="c-head"><span class="ic">★</span>역할 분담</div>
+      <p>Weight를 <strong>"어떤 경로에"</strong> 줄지는 <strong style="color:var(--cyan)">Match Rule</strong>(매칭 대상 prefix)이, <strong>"무엇을 줄지"</strong>는 <strong style="color:var(--green)">Set Rule</strong>(Set Weight)이 담당. <strong>Route Control Context</strong> 안에서 둘을 묶는다.</p>
+    </div>
+
+    <!-- pipeline diagram -->
+    <div class="diagram" style="padding:18px 10px">
+      <svg viewBox="0 0 900 200" role="img" aria-label="Match Set Context 파이프라인">
+        <defs>
+          <marker id="arrC" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/></marker>
+        </defs>
+        <!-- OSPF in -->
+        <g transform="translate(20,70)">
+          <rect width="150" height="64" rx="12" fill="#0a1822" stroke="#fbbf24" stroke-opacity=".7"/>
+          <text x="75" y="27" text-anchor="middle" fill="#fbbf24" font-size="12.5" font-family="monospace">OSPF 외부경로</text>
+          <text x="75" y="46" text-anchor="middle" fill="#6b7d9c" font-size="11" font-family="monospace">10.0.0.0/8 ...</text>
+        </g>
+        <path d="M170,102 L210,102" stroke="#22d3ee" stroke-width="2.5" marker-end="url(#arrC)"/>
+        <!-- Match -->
+        <g transform="translate(214,58)">
+          <rect width="178" height="88" rx="12" fill="rgba(34,211,238,.08)" stroke="#22d3ee"/>
+          <text x="89" y="26" text-anchor="middle" fill="#22d3ee" font-size="13" font-weight="700" font-family="monospace">① Match Rule</text>
+          <text x="89" y="48" text-anchor="middle" fill="#cfe0f5" font-size="11" font-family="monospace">Match Prefix</text>
+          <text x="89" y="66" text-anchor="middle" fill="#6b7d9c" font-size="10.5" font-family="monospace">10.0.0.0/8 le 32</text>
+        </g>
+        <path d="M392,102 L432,102" stroke="#22d3ee" stroke-width="2.5" marker-end="url(#arrC)"/>
+        <!-- Set -->
+        <g transform="translate(436,58)">
+          <rect width="178" height="88" rx="12" fill="rgba(52,211,153,.08)" stroke="#34d399"/>
+          <text x="89" y="26" text-anchor="middle" fill="#34d399" font-size="13" font-weight="700" font-family="monospace">② Set Rule</text>
+          <text x="89" y="48" text-anchor="middle" fill="#cfe0f5" font-size="11" font-family="monospace">Set Weight</text>
+          <text x="89" y="66" text-anchor="middle" fill="#34d399" font-size="13" font-family="monospace">= 100</text>
+        </g>
+        <path d="M614,102 L654,102" stroke="#22d3ee" stroke-width="2.5" marker-end="url(#arrC)"/>
+        <!-- result -->
+        <g transform="translate(658,70)">
+          <rect width="222" height="64" rx="12" fill="#0a1822" stroke="#a78bfa"/>
+          <text x="111" y="27" text-anchor="middle" fill="#a78bfa" font-size="12.5" font-weight="700" font-family="monospace">Route Control Context</text>
+          <text x="111" y="46" text-anchor="middle" fill="#6b7d9c" font-size="10.5" font-family="monospace">Order 10 · Permit · Interleak</text>
+        </g>
+        <text x="450" y="180" text-anchor="middle" fill="#6b7d9c" font-size="11" font-family="monospace">한 Context = "Match에 걸린 경로에 Set 적용"</text>
+      </svg>
+    </div>
+
+    <h3><span class="pin">A-1</span>Set Rule 생성 (Set Weight) — 공통</h3>
+    <div class="path"><b>Tenant</b><span class="sep">›</span>Policies<span class="sep">›</span>Protocol<span class="sep">›</span><b>Set Rules for Route Maps</b></div>
+    <ol class="steps" style="margin-top:14px">
+      <li><strong>Create Set Rules for Route Maps</strong></li>
+      <li>Name: <kbd>SET-WEIGHT-100</kbd></li>
+      <li><strong>Set Weight</strong> 체크 → <strong>Weight = 100</strong> <span style="color:var(--dim)">(유효 범위 0–65535)</span></li>
+      <li>Preference / Community / AS-Path 항목은 <strong style="color:var(--red)">건드리지 않음</strong></li>
+      <li>Submit</li>
+    </ol>
+
+    <h3><span class="pin">A-2</span>Match Rule 생성 (대상 prefix) — 두 가지 방식</h3>
+    <div class="cards-2">
+      <div class="card" style="border-color:rgba(34,211,238,.4)">
+        <div class="c-head" style="font-weight:700;color:var(--cyan)"><span class="ic">①</span>특정 prefix만 (권장 · 정밀)</div>
+        <div class="path" style="margin:10px 0"><b>Tenant</b><span class="sep">›</span>Policies<span class="sep">›</span>Protocol<span class="sep">›</span><b>Match Rules for Route Maps</b></div>
+        <p style="margin:0 0 8px">Name: <kbd>MATCH-EXT-PREFIXES</kbd> → <strong>Match Prefix</strong> 추가:</p>
+        <div class="tbl-wrap" style="margin:0">
+          <table>
+            <thead><tr><th>필드</th><th>값 예시</th><th>설명</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">IP</td><td class="mono" style="color:var(--amber)">10.0.0.0/8</td><td>로컬 우선시킬 prefix</td></tr>
+              <tr><td class="mono">Aggregate</td><td>☑ (=<span class="mono">le 32</span>)</td><td>하위 서브넷 포함</td></tr>
+              <tr><td class="mono">ge (Greater)</td><td>비움 / 8</td><td>최소 길이</td></tr>
+              <tr><td class="mono">le (Less)</td><td>비움 / 32</td><td>최대 길이</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:10px 0 0;color:var(--muted);font-size:13.5px">기본 라우트만 대상이면 IP=<span class="mono">0.0.0.0/0</span> + Aggregate 체크 (=<span class="mono">0.0.0.0/0 le 32</span>)</p>
+      </div>
+      <div class="card">
+        <div class="c-head" style="font-weight:700;color:var(--violet)"><span class="ic">②</span>모든 경로 일괄 (Match 생략)</div>
+        <p style="margin:10px 0 0;color:var(--muted)"><strong>Match Rule은 필수가 아니다.</strong> Route Control Context를 <strong>Action=Permit + Set Rule만</strong> 지정하면 <strong>모든 경로 매칭</strong>.</p>
+        <div class="callout info" style="margin:14px 0 0"><p style="margin:0">모든 외부 prefix를 로컬 우선시키려면 Match Rule 없이 Context에 <kbd>SET-WEIGHT-100</kbd>만 연결. (또는 방식①의 <span class="mono">0.0.0.0/0 le 32</span>로 동일 효과)</p></div>
+      </div>
+    </div>
+
+    <h3><span class="pin">A-3</span>Route Map + Route Control Context 구성</h3>
+    <div class="path"><b>Tenant</b><span class="sep">›</span>Networking<span class="sep">›</span>L3Outs<span class="sep">›</span><b>[L3Out]</b><span class="sep">›</span>Route map for import and export route control</div>
+    <div class="card" style="margin-top:14px">
+      <div class="tbl-wrap" style="margin:0">
+        <table>
+          <thead><tr><th>Context 필드</th><th>값</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">Order</td><td class="mono" style="color:var(--cyan)">10</td><td>낮을수록 먼저 평가</td></tr>
+            <tr><td class="mono">Name</td><td class="mono">CTX-LOCAL-WEIGHT</td><td></td></tr>
+            <tr><td class="mono">Action</td><td><kbd>Permit</kbd></td><td></td></tr>
+            <tr><td class="mono">Match Rule</td><td class="mono">MATCH-EXT-PREFIXES</td><td>방식② 시 비움</td></tr>
+            <tr><td class="mono">Set Rule</td><td class="mono" style="color:var(--green)">SET-WEIGHT-100</td><td>Weight 100</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="callout good" style="margin-bottom:0"><div class="c-head"><span class="ic">⊕</span>Match + Set 결합</div><p>한 Context = "Match에 걸린 경로에 Set 적용". 여러 prefix 그룹에 다른 Weight를 주려면 <strong>Order를 달리한 Context</strong>를 추가.</p></div>
+  </section>
+
+  <!-- 3-B : Per-site application -->
+  <section id="persite" class="reveal">
+    <div class="sec-head"><div class="sec-num">3B</div><h2 class="sec-title">Site1 / Site2 각각 적용 <span style="font-size:15px;color:var(--dim);font-weight:500">(핵심)</span></h2></div>
+
+    <div class="callout key">
+      <div class="c-head"><span class="ic">★</span>가장 중요 — 양쪽 다 Weight 100</div>
+      <p>Weight는 사이트 로컬이므로, <strong>양쪽 사이트가 "각자 자기 로컬 L3Out 경로를 매칭해" 동일한 Weight(100)</strong>를 주면 각 사이트가 독립적으로 자기 BL을 우선. <strong style="color:var(--amber)">사이트별로 다른 값을 줄 필요 없음 — 양쪽 다 100이 정답.</strong></p>
+    </div>
+
+    <div class="callout info"><div class="c-head"><span class="ic">◎</span>핵심 개념</div>
+      <p><strong>각 사이트는 자기 L3Out에만 Weight를 박는다.</strong> Weight는 전파 안 되므로 Site1의 100이 Site2로 넘어가지 않음 → 충돌·전역 우선 없음.</p>
+    </div>
+
+    <!-- per-site mapping diagram -->
+    <div class="diagram" style="padding:18px 10px">
+      <svg viewBox="0 0 900 240" role="img" aria-label="사이트별 Weight 적용 매핑">
+        <!-- Site1 -->
+        <g transform="translate(20,24)">
+          <rect width="410" height="192" rx="16" fill="#0e2530" stroke="#22d3ee" stroke-opacity=".5"/>
+          <text x="22" y="30" fill="#22d3ee" font-size="14" font-weight="700" font-family="monospace">SITE 1 APIC</text>
+          <g transform="translate(22,46)">
+            <rect width="170" height="50" rx="9" fill="#0a1822" stroke="#22d3ee" stroke-opacity=".7"/>
+            <text x="85" y="20" text-anchor="middle" fill="#cfe0f5" font-size="11" font-family="monospace">SET-WEIGHT-100</text>
+            <text x="85" y="37" text-anchor="middle" fill="#34d399" font-size="11" font-family="monospace">+ MATCH-EXT-PREFIXES</text>
+          </g>
+          <text x="206" y="76" fill="#22d3ee" font-size="20">→</text>
+          <g transform="translate(222,46)">
+            <rect width="166" height="50" rx="9" fill="#0a1822" stroke="#22d3ee"/>
+            <text x="83" y="20" text-anchor="middle" fill="#e7ecf5" font-size="11.5" font-family="monospace">L3Out-Site1</text>
+            <text x="83" y="37" text-anchor="middle" fill="#6b7d9c" font-size="10" font-family="monospace">Interleak (import)</text>
+          </g>
+          <g transform="translate(110,118)">
+            <rect width="190" height="50" rx="9" fill="rgba(52,211,153,.1)" stroke="#34d399"/>
+            <text x="95" y="20" text-anchor="middle" fill="#34d399" font-size="11" font-family="monospace">Site1 BL 경로</text>
+            <text x="95" y="37" text-anchor="middle" fill="#34d399" font-size="12" font-family="monospace">Weight 100 (S1 fabric)</text>
+          </g>
+          <path d="M305,96 L205,118" stroke="#34d399" stroke-width="2" fill="none"/>
+        </g>
+        <!-- Site2 -->
+        <g transform="translate(470,24)">
+          <rect width="410" height="192" rx="16" fill="#231a3d" stroke="#a78bfa" stroke-opacity=".5"/>
+          <text x="388" y="30" text-anchor="end" fill="#a78bfa" font-size="14" font-weight="700" font-family="monospace">SITE 2 APIC</text>
+          <g transform="translate(22,46)">
+            <rect width="170" height="50" rx="9" fill="#140f22" stroke="#a78bfa" stroke-opacity=".7"/>
+            <text x="85" y="20" text-anchor="middle" fill="#cfe0f5" font-size="11" font-family="monospace">SET-WEIGHT-100</text>
+            <text x="85" y="37" text-anchor="middle" fill="#34d399" font-size="11" font-family="monospace">+ MATCH-EXT-PREFIXES</text>
+          </g>
+          <text x="206" y="76" fill="#a78bfa" font-size="20">→</text>
+          <g transform="translate(222,46)">
+            <rect width="166" height="50" rx="9" fill="#140f22" stroke="#a78bfa"/>
+            <text x="83" y="20" text-anchor="middle" fill="#e7ecf5" font-size="11.5" font-family="monospace">L3Out-Site2</text>
+            <text x="83" y="37" text-anchor="middle" fill="#6b7d9c" font-size="10" font-family="monospace">Interleak (import)</text>
+          </g>
+          <g transform="translate(110,118)">
+            <rect width="190" height="50" rx="9" fill="rgba(52,211,153,.1)" stroke="#34d399"/>
+            <text x="95" y="20" text-anchor="middle" fill="#34d399" font-size="11" font-family="monospace">Site2 BL 경로</text>
+            <text x="95" y="37" text-anchor="middle" fill="#34d399" font-size="12" font-family="monospace">Weight 100 (S2 fabric)</text>
+          </g>
+          <path d="M305,96 L205,118" stroke="#34d399" stroke-width="2" fill="none"/>
+        </g>
+        <text x="450" y="234" text-anchor="middle" fill="#6b7d9c" font-size="11" font-family="monospace">동일 정책 · 각자 로컬 BL에만 적용 · Weight 전파 안 됨 → 충돌 없음</text>
+      </svg>
+    </div>
+
+    <h3><span class="pin">방법 1</span>각 사이트 APIC에서 개별 설정</h3>
+    <div class="cards-2">
+      <div class="card" style="border-color:rgba(34,211,238,.4)">
+        <div class="c-head" style="color:var(--cyan);font-weight:700;font-size:15px;margin-bottom:8px">[ Site1 APIC ]</div>
+        <ol class="steps" style="margin:0">
+          <li>Tenant › Policies › Protocol<ul><li>Set Rule <span class="mono">SET-WEIGHT-100</span> (Weight 100)</li><li>Match Rule <span class="mono">MATCH-EXT-PREFIXES</span></li></ul></li>
+          <li>L3Outs › <strong>L3Out-Site1</strong> › Route map import/export<ul><li>Context: Order 10 / Permit / Match+Set</li><li><strong>default-import (Interleak)</strong> 연결</li></ul></li>
+          <li>Submit → Site1 BL 경로 Weight 100</li>
+        </ol>
+      </div>
+      <div class="card" style="border-color:rgba(167,139,250,.4)">
+        <div class="c-head" style="color:var(--violet);font-weight:700;font-size:15px;margin-bottom:8px">[ Site2 APIC ]</div>
+        <ol class="steps" style="margin:0">
+          <li>Tenant › Policies › Protocol — <strong>동일하게</strong><ul><li>Set Rule <span class="mono">SET-WEIGHT-100</span></li><li>Match Rule <span class="mono">MATCH-EXT-PREFIXES</span></li></ul></li>
+          <li>L3Outs › <strong>L3Out-Site2</strong> › Route map import/export<ul><li>Context: Order 10 / Permit / Match+Set</li><li><strong>default-import (Interleak)</strong> 연결</li></ul></li>
+          <li>Submit → Site2 BL 경로 Weight 100</li>
+        </ol>
+      </div>
+    </div>
+    <div class="callout good"><div class="c-head"><span class="ic">✓</span>결과</div>
+      <p>Site1 Leaf: Site1 BL(<strong>W100</strong>) vs Remote(<strong>W0</strong>) → <strong style="color:var(--site1)">Site1 우선</strong> · Site2 Leaf: Site2 BL(<strong>W100</strong>) vs Remote(<strong>W0</strong>) → <strong style="color:var(--site2)">Site2 우선</strong></p>
+    </div>
+
+    <h3><span class="pin">방법 2</span>NDO 중앙 배포 <span class="pill yes" style="vertical-align:middle">권장</span></h3>
+    <ol class="steps">
+      <li>NDO › <strong>Route Map Template</strong> 생성: Match(<span class="mono">MATCH-EXT-PREFIXES</span>) + Set(<span class="mono">SET-WEIGHT-100</span>)</li>
+      <li>이 템플릿을 <strong>양쪽 사이트 L3Out의 import/interleak route control</strong>에 연결</li>
+      <li>Template-to-Site 매핑: Site1 템플릿 → Site1 배포 / Site2 템플릿 → Site2 배포</li>
+      <li>Deploy → 두 사이트에 동일 Weight 정책 일관 적용, 드리프트 방지</li>
+    </ol>
+    <div class="callout info" style="margin-bottom:0"><p style="margin:0">NDO에서는 사이트별 L3Out object에 같은 Route Map을 attach하되, 각 site에 배포되어 <strong>그 사이트의 로컬 BL 경로에만</strong> 적용된다.</p></div>
+  </section>
+
+  <!-- 3-C : Traffic Engineering / Order -->
+  <section id="te" class="reveal">
+    <div class="sec-head"><div class="sec-num">3C</div><h2 class="sec-title">향후 트래픽 엔지니어링 — Context Order 동작</h2></div>
+    <div class="callout key">
+      <div class="c-head"><span class="ic">★</span>질문: Order 1·2·3 중 1에 매칭되면 2·3은 적용 안 되나?</div>
+      <p>→ <strong style="color:var(--cyan)">그렇다. First-Match-Wins.</strong> 먼저 매칭된 Context의 Set만 적용하고 평가 종료 — IOS/NX-OS route-map과 동일.</p>
+    </div>
+
+    <!-- Order evaluation flow diagram -->
+    <div class="diagram" style="padding:18px 10px">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Order 평가 플로우 first-match-wins">
+        <defs>
+          <marker id="arrO" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/></marker>
+          <marker id="arrOg" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#34d399"/></marker>
+          <marker id="arrOr" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#f87171"/></marker>
+        </defs>
+        <!-- route in -->
+        <g transform="translate(20,140)">
+          <rect width="120" height="48" rx="10" fill="#0a1822" stroke="#fbbf24" stroke-opacity=".75"/>
+          <text x="60" y="22" text-anchor="middle" fill="#fbbf24" font-size="11.5" font-family="monospace">경로 1개</text>
+          <text x="60" y="38" text-anchor="middle" fill="#6b7d9c" font-size="10" font-family="monospace">prefix X</text>
+        </g>
+        <path d="M140,164 L176,164" stroke="#22d3ee" stroke-width="2.5" marker-end="url(#arrO)"/>
+
+        <!-- Order 1 -->
+        <g transform="translate(180,118)">
+          <rect width="150" height="92" rx="11" fill="rgba(34,211,238,.08)" stroke="#22d3ee"/>
+          <text x="75" y="22" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="700" font-family="monospace">Order 1</text>
+          <text x="75" y="42" text-anchor="middle" fill="#cfe0f5" font-size="10.5" font-family="monospace">Match group1?</text>
+          <text x="75" y="62" text-anchor="middle" fill="#34d399" font-size="10.5" font-family="monospace">Set Weight 300</text>
+          <text x="75" y="80" text-anchor="middle" fill="#6b7d9c" font-size="9.5" font-family="monospace">Permit</text>
+        </g>
+        <!-- match -> stop -->
+        <path d="M255,210 L255,250" stroke="#34d399" stroke-width="2.5" marker-end="url(#arrOg)"/>
+        <text x="265" y="234" fill="#34d399" font-size="10.5" font-family="monospace">매칭 ✓</text>
+        <g transform="translate(180,252)">
+          <rect width="150" height="46" rx="10" fill="rgba(52,211,153,.12)" stroke="#34d399"/>
+          <text x="75" y="20" text-anchor="middle" fill="#34d399" font-size="11" font-weight="700" font-family="monospace">적용 후 STOP</text>
+          <text x="75" y="36" text-anchor="middle" fill="#6b7d9c" font-size="9.5" font-family="monospace">Order 2·3 평가 안 함</text>
+        </g>
+
+        <!-- no match -> next -->
+        <path d="M330,150 L370,150" stroke="#f87171" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrOr)"/>
+        <text x="350" y="140" text-anchor="middle" fill="#f87171" font-size="10" font-family="monospace">불일치</text>
+
+        <!-- Order 2 -->
+        <g transform="translate(374,118)">
+          <rect width="150" height="92" rx="11" fill="rgba(34,211,238,.05)" stroke="#22d3ee" stroke-opacity=".6"/>
+          <text x="75" y="22" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="700" font-family="monospace">Order 2</text>
+          <text x="75" y="42" text-anchor="middle" fill="#cfe0f5" font-size="10.5" font-family="monospace">Match group2?</text>
+          <text x="75" y="62" text-anchor="middle" fill="#34d399" font-size="10.5" font-family="monospace">Set Weight 200</text>
+          <text x="75" y="80" text-anchor="middle" fill="#6b7d9c" font-size="9.5" font-family="monospace">Permit</text>
+        </g>
+        <path d="M524,150 L564,150" stroke="#f87171" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrOr)"/>
+
+        <!-- Order 3 -->
+        <g transform="translate(568,118)">
+          <rect width="150" height="92" rx="11" fill="rgba(34,211,238,.05)" stroke="#22d3ee" stroke-opacity=".6"/>
+          <text x="75" y="22" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="700" font-family="monospace">Order 3</text>
+          <text x="75" y="42" text-anchor="middle" fill="#cfe0f5" font-size="10.5" font-family="monospace">Match group3?</text>
+          <text x="75" y="62" text-anchor="middle" fill="#34d399" font-size="10.5" font-family="monospace">Set Weight 100</text>
+          <text x="75" y="80" text-anchor="middle" fill="#6b7d9c" font-size="9.5" font-family="monospace">Permit</text>
+        </g>
+        <path d="M718,150 L756,150" stroke="#f87171" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrOr)"/>
+
+        <!-- catch-all / implicit deny -->
+        <g transform="translate(760,108)">
+          <rect width="124" height="112" rx="11" fill="rgba(248,113,113,.06)" stroke="#f87171"/>
+          <text x="62" y="24" text-anchor="middle" fill="#f87171" font-size="11" font-weight="700" font-family="monospace">Order 999</text>
+          <text x="62" y="44" text-anchor="middle" fill="#cfe0f5" font-size="9.5" font-family="monospace">0.0.0.0/0 le 32</text>
+          <text x="62" y="60" text-anchor="middle" fill="#34d399" font-size="9.5" font-family="monospace">(Set 없음)</text>
+          <text x="62" y="76" text-anchor="middle" fill="#34d399" font-size="9.5" font-family="monospace">Permit</text>
+          <text x="62" y="96" text-anchor="middle" fill="#fbbf24" font-size="9" font-family="monospace">catch-all 필수</text>
+        </g>
+        <text x="450" y="318" text-anchor="middle" fill="#6b7d9c" font-size="10.5" font-family="monospace">catch-all 없으면 → 맨 끝 implicit deny로 매칭 안 된 경로 전부 DROP</text>
+      </svg>
+    </div>
+
+    <h3><span class="pin">C-1</span>평가 규칙</h3>
+    <div class="card">
+      <ul style="margin:0;padding-left:20px;line-height:2">
+        <li>Context는 <strong>Order 오름차순(1 → 2 → 3)</strong> 평가</li>
+        <li><strong>먼저 매칭된 Context의 Set만 적용하고 종료</strong> → 이후 Order는 그 경로에 적용 안 됨</li>
+        <li>한 경로 = <strong>하나의 Context만</strong> 적용 (누적·덮어쓰기 아님)</li>
+      </ul>
+    </div>
+
+    <h3><span class="pin">C-2</span>TE 설계 실무 포인트</h3>
+    <div class="cards-2">
+      <div class="card" style="border-color:rgba(52,211,153,.4)">
+        <div class="c-head" style="color:var(--green);font-weight:700"><span class="ic">①</span>그룹이 안 겹치면 Order 무의미</div>
+        <p style="margin:10px 0 0;color:var(--muted)">각 prefix가 자기 그룹 Context에만 매칭 → Order 무관 독립 동작. <strong>그룹별 다른 Weight(300/200/100) TE 정상 동작.</strong></p>
+      </div>
+      <div class="card" style="border-color:rgba(251,191,36,.4)">
+        <div class="c-head" style="color:var(--amber);font-weight:700"><span class="ic">②</span>겹치면 낮은 Order 승 &amp; 종료</div>
+        <p style="margin:10px 0 0;color:var(--muted)">group1·group2 둘 다 매칭 가능 prefix → <strong>Order 낮은 쪽(1) 적용 후 종료</strong>, group2 무시.<br><strong style="color:var(--amber)">→ 더 구체적/우선 그룹을 낮은 Order에 배치.</strong></p>
+      </div>
+    </div>
+
+    <h3><span class="pin">C-3</span>⚠️ 가장 주의 — Implicit Deny (catch-all 필수)</h3>
+    <div class="callout danger">
+      <div class="c-head"><span class="ic">⚠</span>매칭 안 된 경로는 전부 DROP된다</div>
+      <p>ACI route-map도 IOS처럼 <strong>맨 끝에 implicit deny</strong>가 있다. 어느 Context에도 매칭 안 된 prefix는 <strong>deny 처리되어 redistribution/import에서 누락</strong>. 일부 그룹에만 Weight를 주면 <strong>나머지 경로가 통째로 사라질 위험.</strong></p>
+    </div>
+    <div class="callout good" style="margin-bottom:0">
+      <div class="c-head"><span class="ic">✓</span>해결 — catch-all Permit</div>
+      <p>맨 끝(가장 높은 Order)에 <strong>catch-all Permit Context</strong>(Match=<span class="mono">0.0.0.0/0 le 32</span>, Set 없음)를 둬서 나머지 경로를 <strong>Weight 변경 없이 통과</strong>시킨다.</p>
+    </div>
+
+    <h3><span class="pin">C-4</span>TE 권장 템플릿 (그룹별 Weight + catch-all)</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Order</th><th>Match Rule</th><th>Set Rule</th><th>Action</th><th>의미</th></tr></thead>
+        <tbody>
+          <tr><td class="mono" style="color:var(--cyan)">1</td><td class="mono">GRP1-PREFIXES</td><td class="mono" style="color:var(--green)">Set Weight 300</td><td><kbd>Permit</kbd></td><td>최우선 그룹</td></tr>
+          <tr><td class="mono" style="color:var(--cyan)">2</td><td class="mono">GRP2-PREFIXES</td><td class="mono" style="color:var(--green)">Set Weight 200</td><td><kbd>Permit</kbd></td><td>차순위 그룹</td></tr>
+          <tr><td class="mono" style="color:var(--cyan)">3</td><td class="mono">GRP3-PREFIXES</td><td class="mono" style="color:var(--green)">Set Weight 100</td><td><kbd>Permit</kbd></td><td>기본 그룹</td></tr>
+          <tr style="background:rgba(251,191,36,.06)"><td class="mono" style="color:var(--amber)">999</td><td class="mono">0.0.0.0/0 le 32</td><td style="color:var(--dim)">(Set 없음)</td><td><kbd>Permit</kbd></td><td style="color:var(--amber)"><strong>catch-all — 나머지 통과 (필수)</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout info"><p style="margin:0"><strong>Deny 활용(선택)</strong>: 특정 prefix를 redistribution에서 <strong>제외</strong>하려면 해당 Context Action=<strong>Deny</strong>(매칭 시 필터·종료). 단, 이 경우에도 끝에 catch-all Permit이 있어야 나머지가 통과.</p></div>
+
+    <h3><span class="pin">C-5</span>빈 Match에 Set이 있으면? <span style="font-size:14px;color:var(--dim);font-weight:500">(나머지에만 적용 — 앞 그룹은 안 건드림)</span></h3>
+    <div class="code">
+      <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="fname">예시 — 마지막 Order 9의 Match를 비움</span></div>
+<pre><code><span class="kw">Order 1</span> : Match <span class="arg">GRP1</span>   <span class="cmd">Set MED 50</span>                <span class="ok">Permit</span>
+<span class="kw">Order 2</span> : Match <span class="arg">GRP2</span>   <span class="cmd">Set MED 10, Weight 200</span>    <span class="ok">Permit</span>
+<span class="kw">Order 3</span> : Match <span class="arg">GRP3</span>   <span class="cmd">Set MED 10, Weight 100</span>    <span class="ok">Permit</span>
+<span class="kw">Order 9</span> : <span class="cmt">(Match 비움)</span> <span class="cmd">Set MED 10, Weight 300</span>  <span class="ok">Permit</span></code></pre>
+    </div>
+    <div class="callout good">
+      <div class="c-head"><span class="ic">✓</span>핵심 — First-Match-Wins</div>
+      <p>각 경로는 <strong>처음 매칭된 Context만 적용하고 거기서 STOP</strong>. <strong>GRP1 대역 → Order 1에서 MED 50 적용하고 멈춤. Order 9는 GRP1에 절대 적용 안 됨.</strong> GRP1의 Weight는 Order 1이 미설정이라 <strong>기본값 0</strong>(Order 9의 300이 오는 게 아님). 빈 Match(Order 9)는 <strong>GRP1/2/3 어디에도 안 걸린 "그 외" 대역에만</strong> 적용.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>경로</th><th>매칭 (여기서 STOP)</th><th>최종 MED</th><th>최종 Weight</th><th>Order 9 영향?</th></tr></thead>
+        <tbody>
+          <tr><td class="mono" style="color:var(--green)"><strong>GRP1</strong></td><td class="mono" style="color:var(--cyan)">Order 1</td><td class="mono"><strong>50</strong></td><td class="mono" style="color:var(--red)"><strong>0</strong></td><td style="color:var(--red);font-family:var(--mono)">✗ 안 받음</td></tr>
+          <tr><td class="mono">GRP2</td><td class="mono" style="color:var(--cyan)">Order 2</td><td class="mono">10</td><td class="mono">200</td><td style="color:var(--red);font-family:var(--mono)">✗ 안 받음</td></tr>
+          <tr><td class="mono">GRP3</td><td class="mono" style="color:var(--cyan)">Order 3</td><td class="mono">10</td><td class="mono">100</td><td style="color:var(--red);font-family:var(--mono)">✗ 안 받음</td></tr>
+          <tr style="background:rgba(251,191,36,.06)"><td class="mono" style="color:var(--amber)">그 외 전부</td><td class="mono" style="color:var(--amber)">Order 9 (match-all)</td><td class="mono" style="color:var(--amber)">10</td><td class="mono" style="color:var(--amber)">300</td><td style="color:var(--green);font-family:var(--mono)">✓ 이 줄 적용</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="color:var(--muted)">→ <strong style="color:#fff">GRP1 = MED 50, Weight 0 으로 확정.</strong> Order 9의 <span class="mono">MED 10, Weight 300</span>은 GRP1에 <strong>안 온다.</strong> (질문하신 대로가 맞음)</p>
+
+    <div class="cards-2">
+      <div class="card" style="border-color:rgba(248,113,113,.4)">
+        <div class="c-head" style="color:var(--red);font-weight:700"><span class="ic">⚠</span>주의 1 — Order 9는 "투명 통과"가 아님</div>
+        <p style="margin:10px 0 0;color:var(--muted)">빈 Match라도 <strong>Set이 있으면 "그 외" 경로 전부에 그 값을 적극 설정</strong>(앞 그룹이 아니라 <em>나머지</em>에). implicit deny만 막고 나머지 값도 안 바꾸려면 → <strong>Set을 비워야</strong> 한다 (<span class="mono">Match 없음 + Set 없음 + Permit</span>). 위 config는 "그 외" 경로가 <strong style="color:var(--amber)">Weight 300(최고)</strong> 을 받음.</p>
+      </div>
+      <div class="card" style="border-color:rgba(251,191,36,.4)">
+        <div class="c-head" style="color:var(--amber);font-weight:700"><span class="ic">⚠</span>주의 2 — 적용 단계 vs best-path 단계는 별개</div>
+        <p style="margin:10px 0 0;color:var(--muted)">"GRP1이 밀린다"는 <strong>Order 9가 GRP1을 덮는다는 뜻이 아니다.</strong> 두 단계를 구분:<br>① <strong>route-map 적용</strong>(first-match): GRP1=MED50/W0 <strong>확정</strong> (Order 9 무관)<br>② <strong>best-path 선택</strong>: 확정된 속성으로 경로 비교. <strong>동일 목적지에 복수 경로가 있을 때만</strong> Weight 비교 발생.</p>
+      </div>
+    </div>
+
+    <h4 style="font-size:15.5px;margin:22px 0 8px;color:#fff">best-path 단계에서만 — Weight 비교</h4>
+    <div class="code">
+      <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="fname">best-path decision order</span></div>
+<pre><code><span class="cmd">Weight</span>(高 우선) → <span class="cmd">Local-Pref</span>(高) → Locally originated → <span class="kw">AS-Path</span>(短)
+  → Origin → <span class="arg">MED</span>(低 우선) → eBGP&gt;iBGP → IGP metric → ...
+<span class="cmt"># 동일 목적지에 GRP1 경로 + 다른 경로가 동시에 있을 때만 W0인 GRP1이 밀림</span>
+<span class="cmt"># GRP1/2/3가 서로 다른 목적지면 best-path 경쟁 자체가 없음 → GRP1 그대로 동작</span></code></pre>
+    </div>
+
+    <div class="callout good" style="margin-bottom:0">
+      <div class="c-head"><span class="ic">✓</span>권장 — 속성 통일 (혼용 금지)</div>
+      <p>같은 라우터(사이트) 안 우선순위만 → <strong>Weight만</strong> 사용(MED 빼기). 외부 eBGP 피어로 광고해 <strong>인바운드 유도</strong> → <strong>MED만</strong> 사용(Weight는 외부로 안 나감). <strong>MED는 외부 광고되지만 Weight는 로컬 전용</strong> — 목적에 맞는 하나로 통일해 혼용을 피한다.</p>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section id="ospf" class="reveal">
+    <div class="sec-head"><div class="sec-num">4</div><h2 class="sec-title">방안 B 상세 <span style="font-size:15px;color:var(--dim);font-weight:500">(OSPF Cost · 보조)</span></h2></div>
+    <div class="card">
+      <ul style="margin:0;padding-left:20px;line-height:2">
+        <li>로컬 L3Out의 <strong>OSPF interface cost를 낮춤</strong> <span class="mono" style="color:var(--dim)">(Logical Interface Profile › OSPF Interface Policy / per-interface cost)</span></li>
+        <li>redistribution 시 MED가 작아져 동률 비교에서 로컬 우선에 유리</li>
+        <li><strong>방안 A(Weight)와 병행</strong> 시 가장 견고</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section id="verify" class="reveal">
+    <div class="sec-head"><div class="sec-num">5</div><h2 class="sec-title">검증 <span style="font-size:15px;color:var(--dim);font-weight:500">(Border Leaf CLI)</span></h2></div>
+    <div class="code">
+      <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="fname">border-leaf# verify</span></div>
+<pre><code><span class="cmt"># VRF 라우팅 테이블 — 어느 경로가 설치됐는지</span>
+<span class="cmd">show ip route vrf</span> <span class="arg">&lt;vrf-name&gt;</span>
+
+<span class="cmt"># EVPN 테이블 — weight / best-path 확인</span>
+<span class="cmd">show bgp l2vpn evpn vrf</span> <span class="arg">&lt;vrf-name&gt;</span> <span class="arg">&lt;prefix&gt;</span>
+
+<span class="cmt"># VRF 내 BGP IPv4 — weight / 선택 경로 확인</span>
+<span class="cmd">show bgp ipv4 unicast vrf</span> <span class="arg">&lt;vrf-name&gt;</span> <span class="arg">&lt;prefix&gt;</span></code></pre>
+    </div>
+    <div class="card">
+      <div class="c-head" style="font-weight:700;margin-bottom:10px">확인 포인트</div>
+      <ul style="margin:0;padding-left:20px;line-height:2">
+        <li>로컬 L3Out 경유 경로의 <strong>weight가 더 높은지(100)</strong>, Remote 경로는 <strong>weight 0</strong></li>
+        <li>해당 로컬 경로가 <strong>best-path(<span class="mono" style="color:var(--green)">&gt;</span>)로 선택</strong>되는지</li>
+        <li>로컬 BL의 next-hop(로컬 TEP)이 선택되는지</li>
+        <li><strong>Site1·Site2 양쪽 Leaf에서 각각</strong> 자기 로컬 경로가 선택되는지 <span style="color:var(--dim)">(전역 우선이 아님)</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section id="scope" class="reveal">
+    <div class="sec-head"><div class="sec-num">6</div><h2 class="sec-title">적용 범위 <span style="font-size:15px;color:var(--dim);font-weight:500">(APIC vs NDO)</span></h2></div>
+    <div class="cards-2">
+      <div class="card">
+        <h3 style="margin-top:0">각 사이트 APIC 개별 설정</h3>
+        <p style="color:var(--muted);margin:0">사이트별로 Route Map 생성 + L3Out 적용.</p>
+      </div>
+      <div class="card" style="border-color:rgba(34,211,238,.35)">
+        <h3 style="margin-top:0">NDO 중앙 배포 <span class="pill yes" style="vertical-align:middle">권장</span></h3>
+        <p style="color:var(--muted);margin:0">Route Map 템플릿을 L3Out external EPG / route control에 연결해 일관 배포. 다중 사이트 일관성 확보에 유리.</p>
+      </div>
+    </div>
+    <div class="callout good"><div class="c-head"><span class="ic">✓</span>권장</div><p>Multi-Site는 <strong>NDO에서 템플릿으로 관리</strong>하여 양 사이트 정책 드리프트 방지.</p></div>
+  </section>
+
+  <!-- 7 -->
+  <section id="flow" class="reveal">
+    <div class="sec-head"><div class="sec-num">7</div><h2 class="sec-title">적용 순서 <span style="font-size:15px;color:var(--dim);font-weight:500">(권장 워크플로우)</span></h2></div>
+    <ol class="steps">
+      <li><strong>(변경 전)</strong> 현재 best-path 캡처: <span class="mono" style="color:var(--cyan)">show bgp ipv4 unicast vrf ...</span> 로 baseline 저장 (Site1·Site2 양쪽)</li>
+      <li>방안 A 적용 (로컬 redistribution 경로에 <strong>Weight 100</strong>) — <strong>양쪽 사이트 L3Out에 각각</strong> 적용</li>
+      <li>검증 명령으로 <strong>각 사이트가 자기 로컬 BL 경로</strong>를 선택하는지 확인</li>
+      <li>필요 시 방안 B(OSPF cost) 병행</li>
+      <li>인그레스 비대칭이 있으면 방안 C(Host Route Advertisement) 추가</li>
+      <li>Remote 백업이 불필요하면 방안 D(Intersite L3Out 해제) 검토</li>
+    </ol>
+  </section>
+
+  <!-- 8 -->
+  <section id="ref" class="reveal">
+    <div class="sec-head"><div class="sec-num">8</div><h2 class="sec-title">참고 문서 <span style="font-size:15px;color:var(--dim);font-weight:500">(Cisco)</span></h2></div>
+    <ol class="refs">
+      <li><span class="rt">Configure Route Control in ACI</span><a href="https://www.cisco.com/c/en/us/support/docs/cloud-systems-management/application-centric-infrastructure-simulator/220710-configure-route-control-in-aci.html" target="_blank" rel="noopener">cisco.com/.../220710-configure-route-control-in-aci.html</a></li>
+      <li><span class="rt">Cisco APIC Layer 3 Networking Configuration Guide, Release 6.2(x) — Route Control with Route Maps and Route Profiles</span><a href="https://www.cisco.com/c/en/us/td/docs/dcn/aci/apic/6x/l3-configuration/cisco-apic-layer-3-networking-configuration-guide-62x/route-control-layer3-config-62x.html" target="_blank" rel="noopener">cisco.com/.../route-control-layer3-config-62x.html</a></li>
+      <li><span class="rt">Cisco ACI Fabric L3Out White Paper</span><a href="https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/guide-c07-743150.html" target="_blank" rel="noopener">cisco.com/.../guide-c07-743150.html</a></li>
+      <li><span class="rt">Cisco ACI Multi-Site Architecture White Paper</span><a href="https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-739609.html" target="_blank" rel="noopener">cisco.com/.../white-paper-c11-739609.html</a></li>
+      <li><span class="rt">Configure Intersite L3Out with ACI Multi-Site Fabrics</span><a href="https://www.cisco.com/c/en/us/support/docs/software/aci-data-center/217597-configure-intersite-l3out-with-aci-multi.html" target="_blank" rel="noopener">cisco.com/.../217597-configure-intersite-l3out-with-aci-multi.html</a></li>
+      <li><span class="rt">Cisco Multi-Site Deployment Guide for ACI Fabrics</span><a href="https://www.cisco.com/c/en/us/td/docs/dcn/whitepapers/cisco-multi-site-deployment-guide-for-aci-fabrics.html" target="_blank" rel="noopener">cisco.com/.../cisco-multi-site-deployment-guide-for-aci-fabrics.html</a></li>
+    </ol>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-line"></div>
+    <div>ACI Multi-Site · Per-Site L3Out Locality 구성 가이드</div>
+    <div style="color:var(--dim)">핵심: <span class="mono" style="color:var(--cyan)">BGP Weight</span>(site-local) 로 각 사이트가 자기 로컬 L3Out 우선 · Local Preference는 전역 전파되어 금지</div>
+  </div>
+</footer>
+
+<script>
+  // progress bar
+  const pb=document.getElementById('progress');
+  const onScroll=()=>{const h=document.documentElement;const sc=h.scrollTop;const max=h.scrollHeight-h.clientHeight;
+    pb.style.width=(max>0?(sc/max*100):0)+'%';};
+  document.addEventListener('scroll',onScroll,{passive:true});onScroll();
+
+  // reveal on scroll
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  // active TOC via section observer
+  const links=[...document.querySelectorAll('nav.toc a')];
+  const map={};links.forEach(a=>map[a.getAttribute('href').slice(1)]=a);
+  const so=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){
+    links.forEach(l=>l.classList.remove('active'));const a=map[e.target.id];if(a)a.classList.add('active');}});},
+    {rootMargin:'-45% 0px -50% 0px'});
+  document.querySelectorAll('section[id]').forEach(s=>so.observe(s));
+</script>
+</body>
+</html>

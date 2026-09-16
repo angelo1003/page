@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cisco ACI NetFlow 기술가이드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<style>
+:root{
+  --bg:#0b1020; --bg2:#0f1630; --panel:#121a36; --panel2:#0e1530;
+  --text:#e8ecf6; --muted:#9fb0d0; --line:#22305c;
+  --cisco:#00bceb; --cisco2:#0d7fa6; --accent:#7c5cff; --accent2:#22d3a6;
+  --warn:#ffb020; --warn-bg:#3a2a05; --info:#39b6ff; --info-bg:#06263a;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0; font-family:'Noto Sans KR',system-ui,sans-serif;
+  background:
+     radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,.18), transparent 60%),
+     radial-gradient(1000px 500px at -10% 10%, rgba(0,188,235,.18), transparent 55%),
+     var(--bg);
+  color:var(--text); line-height:1.75; -webkit-font-smoothing:antialiased;
+}
+.progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:100;
+  background:linear-gradient(90deg,var(--cisco),var(--accent),var(--accent2));}
+
+/* Hero */
+.hero{position:relative;overflow:hidden;padding:70px 24px 56px;text-align:center;
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(18,26,54,.6), transparent);}
+.hero .badge{display:inline-flex;gap:8px;align-items:center;font-size:13px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--cisco);
+  border:1px solid var(--cisco2);padding:6px 14px;border-radius:999px;
+  background:rgba(0,188,235,.08);}
+.hero h1{font-size:clamp(30px,5vw,56px);font-weight:900;margin:18px 0 10px;
+  background:linear-gradient(90deg,#fff,var(--cisco) 60%,var(--accent));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  letter-spacing:-.5px;}
+.hero p{color:var(--muted);max-width:760px;margin:0 auto;font-size:17px;}
+.meta-cards{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:30px;}
+.meta-cards .card{background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;padding:14px 18px;min-width:170px;text-align:left;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);}
+.meta-cards .k{font-size:12px;color:var(--cisco);letter-spacing:.08em;text-transform:uppercase;}
+.meta-cards .v{font-size:14px;color:var(--text);margin-top:4px;font-weight:500;}
+
+/* Layout */
+.wrap{max-width:1180px;margin:0 auto;padding:32px 24px 80px;
+  display:grid;grid-template-columns:260px 1fr;gap:36px;}
+@media(max-width:960px){.wrap{grid-template-columns:1fr;}.toc{position:static!important;max-height:none!important;}}
+
+/* TOC */
+.toc{position:sticky;top:24px;align-self:start;max-height:calc(100vh - 48px);overflow:auto;
+  background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:1px solid var(--line);border-radius:16px;padding:18px;}
+.toc h3{margin:0 0 12px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);}
+.toc a{display:block;color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:9px;
+  font-size:14px;border-left:2px solid transparent;transition:.18s;}
+.toc a:hover{background:rgba(0,188,235,.08);color:var(--text);}
+.toc a.active{color:#fff;background:rgba(124,92,255,.16);border-left-color:var(--cisco);}
+
+/* Content */
+.content{min-width:0;}
+.content h2{font-size:26px;margin:46px 0 16px;padding-top:14px;font-weight:800;
+  position:relative;scroll-margin-top:18px;}
+.content h2::before{content:"";position:absolute;left:-14px;top:20px;bottom:6px;width:5px;
+  border-radius:6px;background:linear-gradient(180deg,var(--cisco),var(--accent));}
+.content h3{font-size:19px;margin:28px 0 10px;font-weight:700;color:#fff;}
+.content h4{font-size:16px;margin:20px 0 8px;font-weight:600;color:var(--cisco);}
+.content h1{display:none;}
+.content p{color:#d6deef;}
+.content a{color:var(--cisco);word-break:break-all;}
+.content ul,.content ol{padding-left:22px;}
+.content li{margin:5px 0;}
+.content li::marker{color:var(--accent2);}
+
+hr{border:none;border-top:1px dashed var(--line);margin:40px 0;}
+
+code{font-family:'JetBrains Mono',monospace;font-size:.92em;}
+:not(pre)>code{background:rgba(124,92,255,.14);color:#d9c9ff;padding:2px 7px;
+  border-radius:6px;border:1px solid rgba(124,92,255,.25);}
+pre{background:#0a0f22!important;border:1px solid var(--line);border-radius:14px;
+  padding:18px 18px;overflow:auto;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02),0 10px 30px rgba(0,0,0,.35);}
+pre code{background:transparent!important;font-size:13.5px;line-height:1.6;}
+
+.table-wrap{overflow:auto;border-radius:14px;border:1px solid var(--line);margin:18px 0;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:14.5px;}
+thead th{background:linear-gradient(180deg,#16213f,#101831);color:#fff;text-align:left;
+  padding:13px 16px;border-bottom:2px solid var(--cisco2);position:sticky;top:0;}
+tbody td{padding:12px 16px;border-bottom:1px solid var(--line);color:#d6deef;vertical-align:top;}
+tbody tr:nth-child(even){background:rgba(255,255,255,.02);}
+tbody tr:hover{background:rgba(0,188,235,.06);}
+
+blockquote{margin:18px 0;padding:14px 18px 14px 16px;border-radius:12px;
+  border:1px solid var(--line);background:var(--panel);position:relative;}
+blockquote p{margin:.3em 0;color:#dfe6f5;}
+blockquote.warn{border-color:#7a5a10;background:linear-gradient(180deg,rgba(255,176,32,.12),rgba(255,176,32,.04));}
+blockquote.info{border-color:#155a7a;background:linear-gradient(180deg,rgba(57,182,255,.12),rgba(57,182,255,.04));}
+blockquote.warn::before{content:"⚠️ 주의";display:block;font-weight:700;color:var(--warn);margin-bottom:4px;font-size:13px;letter-spacing:.04em;}
+blockquote.info::before{content:"📌 참고";display:block;font-weight:700;color:var(--info);margin-bottom:4px;font-size:13px;letter-spacing:.04em;}
+
+.mermaid{background:#0a0f22;border:1px solid var(--line);border-radius:14px;
+  padding:18px;margin:18px 0;text-align:center;overflow:auto;
+  box-shadow:0 10px 30px rgba(0,0,0,.35);}
+
+.content ul li input[type=checkbox]{accent-color:var(--accent2);transform:translateY(1px);margin-right:6px;}
+
+footer{text-align:center;color:var(--muted);font-size:13px;padding:30px 16px 60px;border-top:1px solid var(--line);}
+
+::-webkit-scrollbar{height:10px;width:10px;}
+::-webkit-scrollbar-thumb{background:#26345f;border-radius:8px;}
+::-webkit-scrollbar-thumb:hover{background:#33457a;}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<header class="hero">
+  <span class="badge">● Cisco ACI · Network Tech Guide</span>
+  <h1>ACI NetFlow 기술가이드</h1>
+  <p>Cisco APIC Fabric에서 NetFlow(v9) 기반 트래픽 가시성을 설계·운영하기 위한 실무 기술 문서</p>
+  <div class="meta-cards">
+    <div class="card"><div class="k">대상 독자</div><div class="v">중급+ 네트워크 엔지니어</div></div>
+    <div class="card"><div class="k">기준 릴리스</div><div class="v">APIC 4.x ~ 6.x</div></div>
+    <div class="card"><div class="k">대상 HW</div><div class="v">Nexus 9000 Leaf (-EX 이상)</div></div>
+    <div class="card"><div class="k">Export 포맷</div><div class="v">NetFlow v9</div></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="toc"><h3>목차</h3><div id="toc"></div></nav>
+  <main class="content" id="content"></main>
+</div>
+
+<footer>Generated from <code>ACI-NetFlow-기술가이드.md</code> · Cisco GitHub Copilot</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+
+const md = "# Cisco ACI NetFlow 기술가이드\n\n> **대상 독자**: ACI Fabric을 설계·운영하는 중급 이상 네트워크 엔지니어 (기초 네트워킹 및 ACI 오브젝트 모델 이해 가정)<br>\n> **기준 릴리스/플랫폼**: Cisco APIC 4.x ~ 6.x, Nexus 9000 Leaf (`-EX`/`-FX`/`-FX2`/`-FX3`/`-GX` 이상)<br>\n> **출처**: Cisco APIC NetFlow Configuration Guide, Cisco APIC and NetFlow (KB), Cisco APIC Basic/Layer 4-7 문서, Verified Scalability Guide<br>\n> **작성 방침**: 한국어 설명 + 벤더 원문 용어/CLI/REST 유지. 릴리스별 차이 구분. 미확인 항목은 `확인 필요`로 표기.\n\n> ⚠️ 본 문서의 **스케일 수치·릴리스별 지원 항목**은 환경/릴리스에 따라 달라집니다. 실제 적용 전 반드시 사용 중인 APIC 릴리스의 **Verified Scalability Guide**로 교차 검증하세요.\n\n## 목차\n1. 기술의 기본 정보\n2. 동작 방식 및 원리 (상세)\n3. 전제조건 및 제약사항\n4. 설정 예제\n5. Best Practices\n6. 기타 알아두면 유용한 정보\n\n---\n\n## 1. 기술의 기본 정보\n\n### 1.1 NetFlow란 무엇인가\n\n**NetFlow**는 네트워크 장비가 통과하는 트래픽을 **flow** 단위로 식별·집계하여, 정의된 **collector**(외부 분석 서버)로 export 하는 트래픽 가시성(visibility) 기술입니다. flow는 일반적으로 다음 키 필드의 조합(5-tuple 등)으로 정의됩니다.\n\n- Source/Destination IP\n- Source/Destination Port (L4)\n- Protocol\n- ToS/DSCP, Input Interface 등\n\nACI에서 NetFlow는 leaf switch가 데이터 평면을 지나는 패킷을 하드웨어에서 sampling/집계하여 **NetFlow v9** 포맷으로 collector에 보내는 기능입니다. 단, 하드웨어가 record를 collector로 직접 export하는 것이 아니라, **supervisor engine에서 처리 후** 표준 NetFlow collector로 export합니다.\n\n> 📌 **버전 주의**: Cisco APIC and NetFlow(KB) 기준 ACI exporter의 **지원 버전은 `v9`만** 입니다. GUI에서 다른 버전을 선택해도 자동으로 v9로 설정되며, **IPFIX(v10)는 선택할 수 없습니다.**\n\n### 1.2 어떤 문제를 해결하는가 / 도입 배경\n\n| 문제 | NetFlow가 제공하는 해결 |\n|------|--------------------------|\n| 누가 누구와 통신하는지 모름 | flow 단위 source/destination 가시성 |\n| 보안 사고 사후 추적 어려움 | flow 기록 기반 forensic 분석 |\n| 용량 산정/트래픽 패턴 분석 | top talker, 프로토콜 분포 분석 |\n| EPG/BD/L3Out 단위 트래픽 파악 | ACI 오브젝트 단위 모니터링 정책 적용 |\n\nACI는 분산형 fabric이라 전통적 SPAN/포트미러만으로는 전체 가시성 확보가 어렵습니다. NetFlow는 leaf 하드웨어에서 flow를 직접 export 하므로 fabric-wide 가시성을 비교적 가볍게 확보할 수 있습니다.\n\n### 1.3 핵심 개념·용어 정의\n\n| 용어 | 정의 |\n|------|------|\n| **NetFlow Record Policy** | 어떤 키 필드(match)로 flow를 식별하고 어떤 값(collect)을 모을지 정의. Filter type: `Layer2`, `IPv4`, `IPv6` |\n| **NetFlow Exporter Policy** | flow 데이터를 보낼 collector(목적지 IP/포트), source IP 유형, 소속 VRF/EPG 등 정의 |\n| **NetFlow Monitor Policy** | Record Policy + Exporter Policy를 묶는 상위 정책. 인터페이스/EPG/BD/L3Out에 연결 |\n| **NetFlow Node Policy** | leaf당 NetFlow 타이머 정의: **Collection interval**(collector로 export 주기, 기본 1분), **Template interval**(template 전송 주기, 기본 5분). MTU 설정도 이 정책에서 관리 |\n| **Filter Type** | 모니터링 대상 트래픽 종류 (`ce`=Layer2, `ipv4`, `ipv6`) |\n| **Sampling Rate** | 1:N 샘플링 비율. flow record 정확도 vs 부하의 트레이드오프 (⚠️ EX 스위치는 packet-based sampling 미지원) |\n| **Direction** | flow 수집 방향. **ACI는 `ingress`(수신)만 지원하며 `egress`는 미지원** (출처: Cisco APIC and NetFlow) |\n| **Version** | exporter NetFlow 버전. **ACI는 `v9`만 지원**(IPFIX/v10 선택 불가) |\n| **Collector / Exporter** | export 대상 외부 분석 서버 / export 동작 주체(leaf) |\n\n### 1.4 적용 가능한 플랫폼 / 라이선스 / 도입 릴리스\n\n- **Leaf 하드웨어**: full NetFlow는 `-EX` 세대 이후 leaf에서 지원. 1세대(예: `N9K-9396PX` 등) leaf는 NetFlow를 미지원하거나 제한적이며 주로 **Analytics(Tetration/Cisco Secure Workload) sensor** 방식을 사용. → `확인 필요`: 정확한 모델별 지원은 릴리스 노트/Scalability Guide 확인.\n- **라이선스**: NetFlow 자체는 별도 feature 라이선스가 아닌 ACI 기본 기능. 단, fabric 전체는 적절한 APIC/Nexus 라이선스 tier 필요.\n- **도입 릴리스**: ACI NetFlow는 APIC 2.2(1)에서 최초 제공(자세한 릴리스별 추가 기능은 3.8절 참조). exporter 버전은 **v9만 지원**.\n- **수집 방향**: ACI는 **ingress NetFlow만 지원**하고 egress는 지원하지 않음. 또한 Bridge Domain에서는 **spine switch로부터 유입되는 패킷을 신뢰성 있게 캡처하지 못함** (출처: Cisco APIC and NetFlow).\n\n> 📌 ACI에서 NetFlow와 **Analytics(Tetration)** priority는 동일 하드웨어 리소스를 공유하는 경우가 있어, 일부 플랫폼에서는 동시 사용이 제한됩니다(3장 참조).\n\n---\n\n## 2. 동작 방식 및 원리 (상세)\n\n### 2.1 전체 구성 흐름\n\n```\n[Tenant Policies]\n   ├─ NetFlow Record Policy  (match/collect 필드 정의)\n   ├─ NetFlow Exporter Policy (collector IP/port, source if, VRF)\n   └─ NetFlow Monitor Policy  (Record + Exporter 묶음)\n          │\n          ▼  (연결/적용)\n   ┌─────────────────────────────────────────┐\n   │ Bridge Domain / EPG / L3Out / Interface │  ← Monitor Policy 적용 지점\n   └─────────────────────────────────────────┘\n          │\n          ▼\n   [Leaf Switch HW] flow 식별 → cache → template 생성\n          │  (NetFlow v9 UDP export)\n          ▼\n   [External Collector / Analyzer]\n```\n\n### 2.2 Control Plane 동작 (단계별)\n\n1. APIC에서 Monitor/Record/Exporter Policy를 정의하고 적용 대상(BD/EPG/L3Out/interface)에 바인딩.\n2. APIC가 정책을 해당 leaf로 push → leaf의 NetFlow 하드웨어/소프트웨어 테이블 프로그래밍.\n3. Exporter Policy에 정의된 collector로의 reachability를 위해 **source 인터페이스/VRF**가 결정됨. (collector가 tenant VRF 내부에 있을 수도, in-band/out-of-band를 통할 수도 있음 → 설계 시 reachability 필수 확인)\n4. leaf가 collector에 **template record**를 주기적으로 전송 (NetFlow v9는 template 기반 — collector가 먼저 template을 받아야 data record 해석 가능).\n\n### 2.3 Data Plane 동작 (단계별)\n\n1. 적용된 인터페이스/오브젝트로 패킷 유입.\n2. leaf ASIC가 sampling rate(1:N)에 따라 패킷을 sampling.\n3. Record Policy의 match 필드로 flow key 계산 → flow cache(또는 hardware flow table) 조회.\n   - 신규 flow → 새 엔트리 생성\n   - 기존 flow → byte/packet 카운터 증가, timestamp 갱신\n4. **flow expiration**: ACI 하드웨어는 active/inactive timer를 지원하지 않으며, flow table이 flush될 때 record가 집계되어 **Collection interval(기본 1분)마다 export**됨(3.5절 참조).\n5. NetFlow v9 포맷으로 UDP packet 구성하여 collector로 export. 매 interval마다 software cache가 flush되어 장수명 flow도 packet/byte 카운터가 reset됨.\n\n### 2.4 패킷/제어 흐름 다이어그램\n\n```mermaid\nsequenceDiagram\n    participant APIC\n    participant Leaf as Leaf Switch (HW)\n    participant Col as Collector\n\n    APIC->>Leaf: Push Monitor/Record/Exporter Policy\n    Note over Leaf: NetFlow table programmed\n    Leaf->>Col: NetFlow Template (v9)\n    loop Data plane\n        Note over Leaf: Sample packet (1:N)\n        Note over Leaf: Update flow cache (match/collect)\n    end\n    Note over Leaf: Flow expires (timeout/cache full)\n    Leaf->>Col: Export Data Record (UDP)\n    Col->>Col: Decode using template + analyze\n```\n\n### 2.5 정상 동작 vs 장애/이동/페일오버 시 동작\n\n| 시나리오 | 동작 |\n|----------|------|\n| **정상** | sampling → cache → timeout 기반 export. collector가 template+data로 분석 |\n| **Collector 미도달** | UDP라 retransmit 없음 → export 패킷 유실, flow 데이터 손실 (재전송 메커니즘 없음) |\n| **Endpoint 이동(VM 마이그레이션)** | flow를 처리하는 leaf가 변경되면, 새 leaf에서 새 flow cache 시작. 기존 leaf의 미만료 flow는 timeout 시 export |\n| **Leaf 장애/리로드** | 해당 leaf의 미export flow cache 손실. 재기동 후 정책 재프로그래밍되어 재개 |\n| **정책 변경** | Monitor/Record 변경 시 기존 cache flush 가능 → 일시적 데이터 공백 가능 (`확인 필요`: 릴리스별 동작) |\n\n> ⚠️ NetFlow export는 **UDP 기반이라 신뢰성이 보장되지 않습니다**. 정밀한 billing/보안 forensic이 목적이라면 collector 가용성과 네트워크 경로 손실률을 함께 설계하세요.\n\n### 2.6 정책 구성요소 상세 (Record / Exporter / Node) — 출처: Cisco APIC and NetFlow\n\n#### 2.6.1 Record Policy — Match 파라미터 조합\n\nflow는 `match` 파라미터로 식별합니다. 선택하는 조합은 아래 중 하나(또는 그 부분집합)여야 합니다.\n\n| 조합 | Match 파라미터 |\n|------|----------------|\n| IPv4 | Source IPv4, Destination IPv4, Source Port, Destination Port, IP Protocol, ~~VLAN, IP TOS~~ |\n| IPv6 | Source IPv6, Destination IPv6, Source Port, Destination Port, IP Protocol, ~~VLAN, IP TOS~~ |\n| Layer2 (CE) | Ethertype, Source MAC, Destination MAC, VLAN |\n| IP 공용 | Source IP, Destination IP, Source Port, Destination Port, IP Protocol (Source/Destination IP는 IPv4·IPv6 모두 적용) |\n\n> 📌 **6.0(3) 릴리스부터 `VLAN`·`IP TOS` match 파라미터는 deprecated** 되어 record policy의 match로 선택할 수 없습니다.\n\n#### 2.6.2 Record Policy — Collect 파라미터 (고정, 사용자 설정 불가)\n\ncollect 파라미터는 **고정값**이며 사용자가 변경할 수 없습니다(6.0(3)부터 collect 설정 자체가 deprecated, 전부 fixed).\n\n- Packets, Bytes counter\n- Source Interface, Source VLAN\n- Direction\n- First timestamp, Recent timestamp\n- TCP Flags\n\n#### 2.6.3 Exporter Policy — 필수/주요 속성\n\n- **Destination IP Address** (필수): NetFlow collector의 IPv4/IPv6 주소. **host 형식(`/32` 또는 `/128`)** 이어야 함.\n- **Destination Port** (필수): exporter 애플리케이션이 수신 대기하는 포트.\n- **Source IP Address Type** (NetFlow 패킷의 source IP를 채우는 방식 — 실제 스위치 인터페이스에 해당 주소가 구성되지는 않음):\n  - **Custom Src IP**: fabric 내 구역/노드를 구분하는 tag처럼 사용. **host bit ≥ 12** (IPv4 mask ≤ 20, IPv6 mask ≤ 116). host 부분은 보내는 leaf의 **node-id**로 채워짐.\n  - **Inband Management IP**: 스위치의 in-band 관리 IP.\n  - **OutOfband Management IP**: 스위치의 out-of-band 관리 IP.\n  - **PTEP address**: leaf의 물리 TEP(tunnel endpoint) 주소.\n- **Version**: **`v9`만 지원**.\n- **EPG Type**: App EPG 또는 Layer 3 EPG. exporter가 fabric에 직접 연결(EPG)되거나 L3Out 너머 원격(External L3 EPG)일 수 있음.\n- **VRF 요구**: exporter가 사용하는 VRF는 **NetFlow monitor가 구성된 모든 leaf에 존재**해야 함.\n- **5.1(1) 릴리스부터** management tenant의 **in-band VRF EPG**를 NetFlow exporter와 연관 가능.\n\n#### 2.6.4 Node Policy — 타이머\n\n- **Collection interval**: leaf가 collector로 NetFlow 패킷을 보내는 주기. **기본 1분**.\n- **Template interval**: leaf가 record template을 보내는 주기(이 template으로 collector가 data record 포맷 해석). **기본 5분**.\n\n> 📌 검증 CLI: `show flow exporter` 로 해당 스위치가 NetFlow record에 사용하는 source IP 주소를 확인할 수 있습니다.\n\n---\n\n## 3. 전제조건 및 제약사항\n\n### 3.1 하드웨어/소프트웨어/라이선스 요구사항\n\n- **Leaf**: NetFlow 지원 ASIC 필요 (`-EX` 이상 권장). 1세대 leaf는 미지원/제한적.\n- **APIC**: NetFlow 정책 모델을 지원하는 릴리스.\n- **Collector reachability**: leaf → collector 경로(VRF/in-band/OOB)가 확보되어야 함.\n\n### 3.2 검증된 스케일 한계 (NetFlow Scale)\n\n> 📌 아래 수치는 **Cisco APIC Verified Scalability Guide, Release 6.1(4) / Nexus 9000 ACI-Mode Switches Release 16.1(4)** 기준 공식 검증값입니다 (Updated: April 5, 2026). 다른 릴리스를 사용한다면 해당 릴리스의 Verified Scalability Guide로 교차 검증하세요.\n\n#### 3.2.1 NetFlow Scale 표 (per leaf 기준)\n\n| 항목 | EX 스위치 (LSE) | 그 외 모델 (LSE2: FX/FX3/GX 등) |\n|------|-----------------|----------------------------------|\n| Number of **exporters** | 2 | 2 |\n| Number of **monitor policies under Bridge Domains** | 100 | 350 *(주1)* |\n| Number of **monitor policies under L3Outs** | 100 | 350 *(주1)* |\n| Number of **records per collect interval** | 20,000 | 1,000,000 *(주2)* |\n\n> ⚠️ **주1)** Bridge Domain과 L3Out에 적용된 monitor policy의 **합계**가 350(EX는 100)을 초과하면 안 됩니다.\n>\n> 📌 **주2)** records per collect interval 관련 상세는 Cisco 문서 \"Cisco APIC and NetFlow\" 참조.\n\n#### 3.2.2 LSE / LSE2 플랫폼 분류 (스케일 목적)\n\n> 📌 Verified Scalability Guide는 스케일 관점에서 leaf를 **LSE**와 **LSE2**로 분류합니다. NetFlow 표의 \"EX 스위치\"는 LSE, \"그 외 모델\"은 LSE2에 해당합니다. (실제 기능 지원 여부는 개별 feature 문서로 확인)\n\n| 분류 | 대표 모델 (일부) |\n|------|------------------|\n| **LSE** (EX 계열) | `N9K-C93108TC-EX`, `N9K-C93180YC-EX`, `N9K-C93180LC-EX`, `N9K-C9336C-FX2`, `N9K-C93216TC-FX2`, `N9K-C93240YC-FX2`, `N9K-C9364D-GX2A`, `N9K-C9348D-GX2A` 등 |\n| **LSE2** (FX/FX3/GX 계열) | `N9K-C93108TC-FX`, `N9K-C93180YC-FX`, `N9K-C93600CD-GX`, `N9K-C9364C-GX`, `N9K-C9316D-GX`, `N9K-C93180YC-FX3`, `N9K-C9332D-GX2B` 등 |\n\n> ⚠️ 위 모델 목록은 Verified Scalability Guide의 LSE/LSE2 매핑 표에서 발췌한 **일부**이며, 전체 목록과 정확한 분류는 사용 릴리스의 가이드를 확인하세요.\n\n#### 3.2.3 추가로 확인이 필요한 항목 (`확인 필요`)\n- **Sampling rate** 범위/granularity — NetFlow Scale 표에는 미포함. NetFlow Configuration Guide로 확인.\n- **EPG 단위 monitor** 적용 시 스케일 — 위 표는 BD/L3Out 기준.\n- Remote leaf / Multi-Pod 환경에서의 적용 차이.\n\n### 3.3 미지원 조합 / 상호 배타적 기능 (출처: Cisco APIC and NetFlow)\n\n- **NetFlow vs Analytics(Tetration/Secure Workload) priority**: NetFlow와 Tetration Analytics는 **동일 ASIC building block을 공유하므로 동시에 활성화할 수 없음**. node control policy의 priority(`Analytics`/`NetFlow`)로 우선 feature를 명시해야 하며, 선택되지 않은 feature의 설정은 무시됨. (기본값: Analytics)\n- **NetFlow vs Flow Telemetry(Nexus Dashboard Insights) 동시 불가**: NetFlow와 Flow Telemetry는 **동시에 enable 할 수 없음**.\n- **Direction(egress) 미지원**: ACI NetFlow는 **ingress만 지원**하며 egress는 지원되지 않음. egress 트래픽 가시성이 필요하면 SPAN/ERSPAN 또는 Analytics 등 대체 수단을 검토.\n- **Spine switch 미지원**: **spine switch는 NetFlow를 지원하지 않으며**, spine에서는 패킷으로부터 tenant 레벨 정보를 로컬에서 도출할 수 없음. 또한 BD에 적용 시 **spine switch로부터 유입되는 패킷은 신뢰성 있게 캡처되지 않음**.\n- **통계는 정책(contract) 적용 전 수집**: NetFlow 통계는 **policy enforcement 이전의 ingress 패킷에서 수집**되므로, **contract로 차단(deny)되는 패킷도 record로 집계됨** → 차단 트래픽까지 flow 처리 대상이 되어 리소스 사용량에 영향.\n- **Active exporter 2개 제한**: ACI-mode 스위치는 **monitor policy당 최대 2개의 active exporter**만 지원.\n- **Filter TCAM 스케일 제약**: filter TCAM에는 **BD/인터페이스용 label이 없음**. NetFlow monitor를 **2개 BD에 추가하면 IPv4는 2 rule, IPv6는 8 rule**을 사용 → **1K filter TCAM(IPv4 최대 1k / IPv6 최대 256 match criteria)** 한도 내에서 BD 수가 늘수록 스케일이 빠르게 제한됨. (IPv6 flow record는 hardware table에서 IPv4의 2배 공간 사용)\n- **CPU 생성 패킷의 inter-VRF 라우팅 불가**: leaf의 NetFlow 트래픽은 **CPU에서 생성되는 패킷**이라, 스위치가 inter-VRF 라우팅을 수행하지 못해 **collector에 도달하지 못하는 경우**가 있음. 우회책으로 collector L3Out과 동일 VRF에 이미 구성된 EPG에 **fake static path**를 생성. 또한 exporter endpoint가 BD 뒤에 있으면 해당 **BD의 unicast routing knob을 enable**해야 함(미enable 시 collector operSt가 disabled).\n- **Filter type별 1개 monitor**: 동일 인터페이스/BD에는 **주소 패밀리(IPv4 / IPv6 / CE) 당 monitor policy 1개씩** 적용 가능(패밀리별로 서로 다른 정책 enable 가능).\n- **SPAN/ERSPAN과의 리소스 경합** 가능성 검토 필요.\n- **Remote leaf / Multi-Pod / Multi-Site** 환경에서의 collector reachability 및 지원 여부 별도 확인. (Remote leaf NetFlow는 APIC 4.0(1)부터 지원)\n\n### 3.4 전체 포트(전 fabric) 무차별 적용 시 부하·리소스 영향 ⭐\n\n> ❓ **자주 묻는 질문**: \"NetFlow를 **전체 포트에 설정하면 부하 문제**가 있는가?\"\n>\n> Cisco 공식 문서에 **\"전체 포트 적용 시 부하\"를 직접 정량화한 단일 문장은 없으나**, 아래 제약/동작상 특성을 종합하면 **스위치 리소스(특히 TCAM·CPU) 사용량 증가로 부하가 발생할 수 있으며 스케일·성능에 영향**을 줍니다. (근거: Cisco APIC and NetFlow — Limitations / Deployment Considerations)\n\n| 부하 요인 | 근거 (공식 문서) | 영향 |\n|-----------|------------------|------|\n| **차단 패킷까지 집계** | 통계는 policy enforcement 이전 수집, deny 패킷도 record | 불필요한 flow까지 cache/export 대상 → 처리량 증가 |\n| **filter TCAM 소모** | BD당 IPv4 2 rule / IPv6 8 rule, TCAM 1K(IPv4)·256(IPv6) | 다수 BD·포트 적용 시 TCAM 고갈 → 스케일 제한 |\n| **flow record 스케일 한계** | leaf당 records/collect interval, BD monitor 수 한계 (3.2절) | 한계 초과 시 flow 누락 / 정책 미적용 |\n| **CPU export 부하** | export 시점 CPU spike (아래 3.5절 MTU 사례) | 대규모 flow에서 collection 주기마다 CPU 순간 100%까지 상승 가능 |\n| **hash collision** | hardware table은 hash 기반 → 충돌 시 일부 flow 미캡처 | flow 수 증가 시 정확도/granularity 저하 |\n\n> ✅ **권장**: 전체 포트에 **무분별하게 적용하지 말 것**. 모니터링 목적에 맞게 **대상 BD/EPG/L3Out/인터페이스를 선별**하고, exporter·monitor·node policy(특히 MTU, collection interval)를 신중히 계획하세요. (선별 적용 상세는 5장 Best Practices 참조)\n\n### 3.5 NetFlow 배포 고려사항 (Deployment Considerations, 출처: Cisco APIC and NetFlow)\n\n- **Node policy MTU를 9000으로 설정 권장**: `Fabric > Access Policies > Policies > Switch > NetFlow Node > default`에서 MTU를 9000으로 설정. 단일 export 패킷에 더 많은 flow record가 담겨 **export 시 CPU 사용률이 감소**함. 고스케일 배포에서 특히 중요 — 예) **flow record 100만 개 + MTU 1500**이면 collection interval마다 export 시 **CPU가 수 초간 100%까지 spike**, **MTU 9000으로 설정 시 spike가 80% 미만 + 지속시간 단축**.\n- **Hardware table은 software cache의 일부 크기**: NetFlow는 hash 기반 hardware table에 flow를 캡처 후 주기적으로 CPU의 software cache로 export. hash collision으로 인해 table에 공간이 있어도 일부 flow가 캡처되지 않을 수 있음. software cache는 IPv4/IPv6 flow record를 최대 100만 개까지 보관(IPv6는 hardware table에서 IPv4의 2배 공간).\n- **Active/Inactive timer 미지원**: 하드웨어는 active/inactive timer를 지원하지 않음. flow table은 flush될 때 record가 집계되며 **매 1분(기본 collection interval)마다 export**됨. 매 export interval마다 software cache가 flush되어, 장수명(long-lived) flow라도 다음 interval에는 packet/byte 카운터가 reset됨.\n- **flow duration granularity 저하**: 전체 flow 수가 증가할수록 flow record에 실리는 flow duration의 granularity가 저하됨.\n\n### 3.6 EX 플랫폼 스위치 추가 제약 (출처: Cisco APIC and NetFlow — NetFlow on EX Platform Switches)\n\n`-EX` 플랫폼 스위치에는 일반 제약 외에 다음이 추가로 적용됩니다.\n\n- **bridged/routed 구분 불가**: BD에서 NetFlow 지원은 되나, bridged 패킷과 routed 패킷을 구분하지 못함. SVI(interface VLAN)에 적용해 **routed 패킷만 수집하도록 제한할 수 없음**.\n- **encapsulation VLAN 미제공**: flow record에 encapsulation VLAN을 담지 못함.\n- **MAC 분류 기능 없음**: MAC address packet classify 기능이 없어, configuration engine flow record에는 **non-IP 주소 flow만** 포함(ARP는 이미 IP 주소로 취급).\n- **packet-based sampling 미지원**: 일반적인 M out of N packet sampling을 지원하지 않음.\n- **flow hash 제약**: ToS 또는 source interface를 flow hash의 일부로 사용하는 것을 미지원. source interface 정보는 record에 수집되나 **ToS 정보는 EX에서 수집되지 않음**.\n- **flow record 수 제한**: 각 type별 **flow record 2개**만 지원(예외: configuration engine flow record는 4개).\n- **ARP/ND 프로토콜 번호**: ARP Req 249 / ARP Res 250 / RARP Req 247 / RARP Res 248 / ND Sol 249 / ND Adv 250, 그 외 ARP·ND는 255로 설정.\n- **스케일 증가 미적용**: APIC **5.2(7)·6.0(3)의 NetFlow 스케일 증가는 EX 스위치에 적용되지 않음**. EX 스케일은 사용 릴리스 Verified Scalability Guide 참조.\n\n> 📌 추가 공통 제약(ARP/ND를 IP 패킷처럼 처리 → 일부 collector가 해석 못할 수 있음, ICMP checksum이 L4 src port에 포함되어 미마스킹 시 flow 엔트리 다수 생성 등)도 함께 고려하세요.\n\n### 3.7 지원 인터페이스 (출처: Cisco APIC and NetFlow — NetFlow Supported Interfaces)\n\nNetFlow가 지원되는 인터페이스 유형:\n\n- Physical Ethernet (Layer 2 및 Layer 3)\n- Port channel (PC), Virtual port channel (vPC)\n- Fabric Extender (FEX), FEX PC, FEX vPC\n- Layer 3 sub-interface\n- SVI\n- Bridge domains\n\n> 📌 다른 인터페이스 정책과 달리 **NetFlow는 인터페이스에 기본 적용되지 않으며, 해당 인터페이스에서 명시적으로 enable** 해야 합니다. 각 인터페이스마다 주소 패밀리(filter)를 지정해야 하며(`IPv4` / `IPv6` / `CE`=classical ethernet/Layer2), 동일 인터페이스에 주소 패밀리별로 서로 다른 monitor policy를 enable 할 수 있습니다.\n\n### 3.8 릴리스별 지원 히스토리 (출처: Cisco APIC and NetFlow — New and Changed Information)\n\n| 릴리스 | 변경/추가 | 내용 |\n|--------|-----------|------|\n| **6.0(3)** | VLAN·IP TOS 파라미터 deprecation | record policy의 match 파라미터로 `VLAN`·`IP TOS`를 더 이상 선택 불가. collect 파라미터도 전부 고정(설정 deprecated) |\n| **5.2(8)** | NetFlow Scale 증가 | records per collect interval 20,000 → **1,000,000**, BD당 monitor policy 100 → **350** (단, EX 미적용) |\n| **5.1(1)** | Exporter Policy | management tenant의 **in-band L3 EPG**를 NetFlow exporter와 연관 가능 |\n| **4.0(1)** | Remote Leaf | **remote leaf 스위치**에서 NetFlow 지원 |\n| **2.3(1)** | FX 플랫폼 | **FX 플랫폼 스위치**에서 NetFlow 지원 |\n| **2.2(1)** | 최초 릴리스 | Cisco APIC and NetFlow 가이드 최초 배포 |\n\n> 📌 정확한 모델별 지원은 사용 릴리스의 **Cisco Nexus 9000 ACI-Mode Switches Release Notes** 및 **APIC NetFlow Configuration Guide**에서 확인하세요.\n\n## 4. 설정 예제\n\n> 아래는 **개념적 구성 흐름**을 보여줍니다. 정확한 GUI 경로/필드명·REST class 속성은 사용 릴리스의 NetFlow Configuration Guide 및 APIC Management Information Model Reference로 확인하세요(`확인 필요` 표기 부분).\n\n### 4.1 GUI 구성 순서 (Tenant 기준)\n\n```\nTenant > Policies > NetFlow\n  1) Record Policy 생성\n     - Filter Type: IPv4 (또는 Layer2 / IPv6)\n     - Match Parameters: Source IP, Destination IP, Protocol, L4 Src/Dst Port\n     - Collect Parameters: Bytes Counter, Packets Counter, Pkt Disposition 등\n  2) Exporter Policy 생성\n     - Destination IP / Port (collector)\n     - Source IP Type / Source Interface\n     - Associated EPG 또는 VRF (collector reachability 경로)\n  3) Monitor Policy 생성\n     - Associate Record Policy\n     - Associate Exporter Policy\n  4) Monitor Policy 적용\n     - Bridge Domain / EPG / L3Out Interface 등에 NetFlow Monitor 연결\n     - Direction: Ingress *(ACI는 ingress만 지원, egress 옵션 없음)*\n     - Sampling Rate 지정\n```\n\n### 4.2 REST API 예제 (개념 골격)\n\n> ⚠️ 아래 class/속성명은 **개념 예시**입니다. 실제 class(예: `netflowRecordPol`, `netflowExporterPol`, `netflowMonitorPol`)와 속성은 사용 릴리스의 MIM Reference로 검증하세요(`확인 필요`).\n\n```xml\n<!-- Tenant 하위 NetFlow 정책 (개념 골격) -->\n<fvTenant name=\"PROD\">\n\n  <!-- 1) Record Policy: flow를 무엇으로 식별/수집할지 -->\n  <netflowRecordPol name=\"REC-IPV4\"\n                    matchType=\"IPv4\">\n    <!-- match/collect 파라미터는 릴리스별 child class로 정의: 확인 필요 -->\n  </netflowRecordPol>\n\n  <!-- 2) Exporter Policy: 어디로 보낼지 -->\n  <netflowExporterPol name=\"EXP-COLLECTOR1\"\n                      dstAddr=\"10.10.10.50\"\n                      dstPort=\"2055\"\n                      srcAddrType=\"custom-src-ip\"\n                      srcAddr=\"10.10.10.1\">\n    <!-- collector reachability용 VRF/EPG 연관: 확인 필요 -->\n  </netflowExporterPol>\n\n  <!-- 3) Monitor Policy: Record + Exporter 묶음 -->\n  <netflowMonitorPol name=\"MON-PROD\">\n    <netflowRsMonitorToRecord tnNetflowRecordPolName=\"REC-IPV4\"/>\n    <netflowRsMonitorToExporter tnNetflowExporterPolName=\"EXP-COLLECTOR1\"/>\n  </netflowMonitorPol>\n\n</fvTenant>\n```\n\n```xml\n<!-- 4) Monitor Policy를 Bridge Domain에 적용 (개념 골격) -->\n<fvBD name=\"BD-WEB\">\n  <fvRsBDToNetflowMonitorPol tnNetflowMonitorPolName=\"MON-PROD\"\n                             fltType=\"ipv4\"/>\n</fvBD>\n```\n\n### 4.3 검증(verify) — Leaf CLI\n\n> 📌 NX-OS style CLI는 leaf에 SSH 접속 후 사용. 정확한 명령은 릴리스별로 다를 수 있어 `?`/`show` 자동완성으로 확인 권장.\n\n```bash\n# Leaf에 적용된 NetFlow monitor 확인\nleaf# show flow monitor\n\n# NetFlow record(매치/수집 필드) 확인\nleaf# show flow record\n\n# Exporter(목적지/상태) 확인\nleaf# show flow exporter\n\n# 인터페이스별 NetFlow 적용 상태\nleaf# show flow interface\n\n# 하드웨어 캐시/통계 (플랫폼별)\nleaf# show flow cache         # 확인 필요: 플랫폼별 지원\n```\n\n**기대 출력 포인트**\n- exporter state가 `up`/`active`\n- monitor가 의도한 record/exporter와 바인딩됨\n- 대상 인터페이스에 monitor가 ingress로 적용됨 (ACI는 ingress만 지원)\n- flow count가 0이 아니고 증가함 (트래픽 존재 시)\n\n**Collector 측 검증**\n- collector(예: 분석 서버)에서 해당 leaf source IP로부터 **template + data record** 수신 확인\n- flow의 src/dst/port/byte 값이 실제 트래픽과 일치하는지 sanity check\n\n---\n\n## 5. Best Practices\n\n### 5.1 설계 체크리스트\n- [ ] NetFlow 지원 leaf(`-EX` 이상)인지 하드웨어 사전 확인\n- [ ] collector까지의 **reachability(VRF/in-band/OOB)** 경로를 명확히 설계\n- [ ] export **source IP**가 collector에서 식별 가능하도록 일관되게 지정\n- [ ] **sampling rate**를 트래픽 규모에 맞게 선정 (전수 수집은 부하·cache 고갈 위험)\n- [ ] ⭐ **모니터링이 꼭 필요한 BD/EPG/L3Out에만 선별 적용 — 전 fabric 무차별 적용은 지양** ⭐\n- [ ] ⭐ **NetFlow Node policy MTU를 9000으로 설정** — export 시 CPU spike 완화 (3.5절 근거: 100만 flow·MTU 1500 시 CPU 순간 100% → MTU 9000 시 80% 미만)\n- [ ] **monitor policy당 active exporter는 최대 2개** 제한 인지하여 collector 이중화 설계\n- [ ] NetFlow와 **Analytics(Tetration)** / **Flow Telemetry(NDI)** 는 동시 enable 불가 — 텔레메트리 방식 사전 결정\n- [ ] **contract로 차단되는 패킷도 record로 집계됨**(정책 적용 전 수집) 인지 — 불필요 트래픽 다량 구간 적용 시 부하 가중\n\n> ⚠️ **핵심 권장사항 — 선별 적용**\n>\n> NetFlow monitor는 **모니터링이 꼭 필요한 BD / EPG / L3Out에만 선별적으로 적용**하세요.\n>\n> **전 fabric에 무차별로 적용하면** monitor policy 스케일 한계(3.2절: BD+L3Out 합계 350, EX 100) 초과, leaf 하드웨어/CPU 부하, export 트래픽 폭증, 운영 복잡도 급증으로 이어집니다.\n\n### 5.2 운영 체크리스트\n- [ ] collector 가용성/디스크/수신 rate 모니터링 (UDP 유실 대비)\n- [ ] export 패킷이 in-band 트래픽 대역을 과도하게 점유하지 않는지 확인\n- [ ] 정책 변경 시 cache flush로 인한 일시적 공백 가능성 인지\n- [ ] 릴리스 업그레이드 전 NetFlow 관련 Release Notes / BST 점검\n\n### 5.3 안티패턴 (흔한 실수와 이유)\n\n| 안티패턴 | 왜 문제인가 |\n|----------|-------------|\n| sampling 없이 1:1 전수 수집 | flow cache 고갈, leaf CPU/HW 부하, export 폭증 |\n| collector reachability 미검증 후 적용 | export 패킷이 silent drop → \"설정했는데 데이터 0\" |\n| 모든 BD/EPG에 무차별 monitor 적용 | 스케일 한계 초과, 운영 복잡도 급증 |\n| UDP 유실 무시하고 billing/forensic 용도로 신뢰 | 데이터 누락으로 잘못된 결론 |\n| 1세대 leaf에서 NetFlow 기대 | 미지원 → 기능 자체가 동작 안 함 |\n| Filter type(IPv4/IPv6/Layer2) 불일치 | 의도한 트래픽이 매치되지 않아 flow 미수집 |\n\n---\n\n## 6. 기타 알아두면 유용한 정보\n\n### 6.1 트러블슈팅 흐름\n\n```mermaid\nflowchart TD\n    A[NetFlow 데이터 안 들어옴] --> B{Leaf가 지원 HW?}\n    B -- No --> B1[지원 leaf로 교체 또는 Analytics 방식 검토]\n    B -- Yes --> C{show flow exporter state up?}\n    C -- No --> C1[collector reachability/VRF/source IP 점검]\n    C -- Yes --> D{show flow interface 적용됨?}\n    D -- No --> D1[Monitor Policy 바인딩/Filter type 점검]\n    D -- Yes --> E{flow count 증가?}\n    E -- No --> E1[sampling rate/트래픽 존재/match 필드 점검]\n    E -- Yes --> F{collector가 수신?}\n    F -- No --> F1[방화벽/UDP port/template 수신 점검]\n    F -- Yes --> G[정상]\n```\n\n### 6.2 모니터링 / 로그 확인 포인트\n- Leaf: `show flow exporter`, `show flow monitor`, `show flow interface`\n- APIC: Faults(정책 적용 실패 fault), System/Tenant audit log\n- Collector: source별 packet rate, template 수신, decode error 카운터\n- 네트워크 경로: collector 향 UDP port(예: 2055/4739 등) 허용 여부 — 정확 port는 Exporter Policy 설정값 기준\n\n### 6.3 유사·연관 기술과의 비교\n\n| 기술 | 특징 | NetFlow 대비 |\n|------|------|--------------|\n| **SPAN / ERSPAN** | 패킷 전체 미러링 | full packet 캡처 가능하나 대역·리소스 부담 큼, 전수 가시성엔 부적합 |\n| **Cisco Tetration / Secure Workload (Analytics)** | flow + telemetry + 정책 분석 | 더 풍부한 분석, 단 sensor/리소스 요구. NetFlow와 리소스 경합 가능 |\n| **sFlow** | 표준 sampling 기반 | ACI leaf의 export 모델은 NetFlow v9 중심 |\n| **Streaming Telemetry** | push 기반 telemetry | 실시간성↑, 별도 파이프라인 필요 |\n\n### 6.4 마이그레이션 고려사항\n- 1세대 → `-EX` 이상 leaf 전환 시 NetFlow 기능 신규 활성화 가능\n- Analytics(Tetration) 운영 중인 fabric에 NetFlow 추가 시 리소스 충돌 사전 검증\n- collector가 ACI exporter의 **v9 template/필드 포맷**을 올바르게 해석하는지 확인(ACI는 IPFIX/v10 미지원)\n\n### 6.5 Addendum: NetFlow Match Criteria & Flow Masks (출처: Cisco APIC and NetFlow)\n\n#### 6.5.1 Match Criteria (Filter TCAM)\n\nFT block의 filter TCAM이 어떤 flow를 flow table에 설치할지 매칭합니다. IPv4·IPv6·Layer2(CE) 키를 지원합니다.\n\n- **용량**: IPv4는 TCAM에 **최대 1k match criteria**, IPv6는 **4 엔트리를 사용해 최대 256 match criteria**.\n- **IP 키**: Src TEP/VIF, Dst TEP, IP Flags, TCP Flags, Src IP, Dst IP, Tenant(= infra transit 또는 BD의 VNI), Protocol, Src L4 Port, Dst L4 Port\n- **CE 키**: Src TEP, Dst TEP, Tenant, MAC SA, MAC DA, Ethertype\n\n> 📌 패킷이 TCAM에 프로그래밍된 criteria에 매칭되고 TCAM action이 특정 mask로 flow 수집을 지시하면, 해당 패킷이 flow table에 설치됩니다.\n\n#### 6.5.2 Flow Masks (EX 스위치)\n\nEX 스위치는 각 type(IPv4/IPv6/CE)마다 **4개의 mask**를 제공합니다. mask는 패킷 집합에서 \"무엇을 동일 flow로 볼지\"를 정의하며, 하나의 flow가 flow table의 한 엔트리를 차지합니다.\n\n예) 5-tuple(SIP, DIP, Protocol, Sport, Dport) + BD를 flow로 구성하면, 해당 필드가 다른 패킷은 서로 다른 flow가 됩니다. 반면 **L4 Sport를 mask out** 하면 나머지가 동일하고 Sport만 다른 패킷들은 같은 flow로 묶여 한 엔트리에 통계가 집계됩니다.\n\n```\nPkt 1: BD1, 10.1.1.12 > 10.1.1.13, TCP, Sport 10000, Dport 80, Bytes = 100\nPkt 2: BD1, 10.1.1.12 > 10.1.1.13, TCP, Sport 20000, Dport 80, Bytes = 200\n        ↓ (L4 Sport masking)\nFlow 1: BD1, 10.1.1.12 > 10.1.1.13, TCP, Sport = 0, Dport 80, Bytes = 300\n```\n\n#### 6.5.3 Telemetry Method (Fabric Node Control)\n\nleaf의 telemetry feature는 Fabric Node Control에서 택일합니다 (NetFlow는 Analytics·Flow Telemetry와 동시 enable 불가).\n\n| 옵션 | 의미 | 비고 |\n|------|------|------|\n| **Analytics Priority** | Cisco Tetration Analytics | 3.1(1) 이전 기본값 |\n| **NetFlow Priority** | NetFlow | NetFlow 사용 시 선택 |\n| **Telemetry Priority** | Cisco Nexus Dashboard Insights flow telemetry | 3.1(2)부터 제공·해당 릴리스 기본값 |\n\n### 6.6 참고 문서 (출처)\n- **Cisco APIC NetFlow Configuration Guide** (사용 릴리스 버전)\n- **Cisco APIC Verified Scalability Guide, Release 6.1(4)** (NetFlow Scale 수치 근거): https://www.cisco.com/c/en/us/td/docs/dcn/aci/apic/6x/verified-scalability/cisco-aci-verified-scalability-guide-614.html\n- **Cisco APIC Release Notes** (릴리스별 지원/제약)\n- **Cisco APIC and NetFlow (KB)** (ingress-only 등 동작/제약 근거): https://www.cisco.com/c/en/us/td/docs/switches/datacenter/aci/apic/sw/kb/b_KB_Cisco_APIC_and_NetFlow.html\n- **Cisco APIC Management Information Model Reference** (`netflowRecordPol`, `netflowExporterPol`, `netflowMonitorPol` 등 class 속성)\n- **Cisco Bug Search Tool (BST)**: https://bst.cloudapps.cisco.com/bugsearch\n- **Cisco Nexus 9000 ACI-Mode Switches** 하드웨어 데이터시트 (NetFlow 지원 모델 확인)\n\n> ⚠️ 정확한 URL은 릴리스마다 경로가 달라집니다. cisco.com에서 \"APIC NetFlow Configuration Guide, Release <사용 버전>\"으로 검색해 해당 릴리스 문서를 사용하세요.\n\n---\n\n### 검증이 필요한 항목 요약 (`확인 필요` 라벨 모음)\n1. 모델별 NetFlow 지원 여부 (1세대 vs `-EX` 이상)\n2. **지원 버전은 v9만** (IPFIX/v10 미지원) — 확인 완료(2.6절). remote leaf 4.0(1)·FX 2.3(1)·in-band exporter 5.1(1) 등 릴리스 히스토리는 3.8절 참조 (참고: egress NetFlow는 ACI에서 미지원)\n3. leaf당 monitor/exporter/flow entry **스케일 수치** — 6.1(4) 기준 반영 완료(3.2절). 다른 릴리스 사용 시 해당 Verified Scalability Guide 재확인\n4. NetFlow ↔ Analytics(Tetration) / Flow Telemetry(NDI) 동시 사용 제약 — **동시 enable 불가 확인 완료**(3.3절). priority 선택 방식만 릴리스별 확인\n5. REST class/속성 정확명 (MIM Reference)\n6. **전체 포트 적용 시 부하** — 직접 정량 수치는 미문서화이나 TCAM/CPU 제약·MTU/CPU spike 사례로 영향 확인(3.4·3.5절). sampling/MTU/선별 적용으로 완화 권장\n";
+
+const mermaidBlocks = [];
+const mdPrepped = md.replace(/```mermaid\s*([\s\S]*?)```/g, (m, code) => {
+  const id = mermaidBlocks.push(code.trim()) - 1;
+  return `\n<div class="mermaid" data-mm="${id}"></div>\n`;
+});
+
+marked.setOptions({ gfm:true, breaks:false });
+const contentEl = document.getElementById('content');
+contentEl.innerHTML = marked.parse(mdPrepped);
+
+document.querySelectorAll('.mermaid[data-mm]').forEach(el=>{
+  el.textContent = mermaidBlocks[el.getAttribute('data-mm')];
+});
+
+contentEl.querySelectorAll('table').forEach(t=>{
+  const w=document.createElement('div'); w.className='table-wrap';
+  t.parentNode.insertBefore(w,t); w.appendChild(t);
+});
+
+contentEl.querySelectorAll('blockquote').forEach(b=>{
+  const txt=b.textContent;
+  if(txt.includes('⚠️')){b.classList.add('warn'); b.innerHTML=b.innerHTML.replace(/⚠️\s*/,'');}
+  else if(txt.includes('📌')){b.classList.add('info'); b.innerHTML=b.innerHTML.replace(/📌\s*/,'');}
+});
+
+contentEl.querySelectorAll('li').forEach(li=>{
+  const m=li.innerHTML.match(/^\s*\[( |x|X)\]\s*/);
+  if(m){const ck=m[1].toLowerCase()==='x';
+    li.style.listStyle='none'; li.style.marginLeft='-18px';
+    li.innerHTML=`<input type="checkbox" ${ck?'checked':''} disabled> `+li.innerHTML.replace(/^\s*\[( |x|X)\]\s*/,'');
+  }
+});
+
+contentEl.querySelectorAll('pre code').forEach(b=>{ try{hljs.highlightElement(b);}catch(e){} });
+
+const toc=document.getElementById('toc'); const heads=[...contentEl.querySelectorAll('h2')];
+heads.forEach((h,i)=>{
+  const id='sec-'+i; h.id=id;
+  const a=document.createElement('a'); a.href='#'+id; a.textContent=h.textContent; toc.appendChild(a);
+});
+
+mermaid.initialize({ startOnLoad:false, theme:'dark',
+  themeVariables:{ primaryColor:'#16213f', primaryTextColor:'#e8ecf6', primaryBorderColor:'#00bceb',
+    lineColor:'#7c5cff', secondaryColor:'#0d7fa6', tertiaryColor:'#101831', fontFamily:'Noto Sans KR' }});
+await mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
+
+const links=[...toc.querySelectorAll('a')];
+const spy=()=>{
+  const top=window.scrollY+120; let cur=0;
+  heads.forEach((h,i)=>{ if(h.offsetTop<=top) cur=i; });
+  links.forEach((l,i)=>l.classList.toggle('active',i===cur));
+  const sc=document.documentElement.scrollHeight-innerHeight;
+  document.getElementById('progress').style.width=(sc>0?(scrollY/sc*100):0)+'%';
+};
+addEventListener('scroll',spy,{passive:true}); spy();
+</script>
+</body>
+</html>
